@@ -430,6 +430,23 @@ function drillProgress(id) {
   return { d, m, h, first, last, best, change, improved, fmt: v => m.outOf ? `${v}/${m.outOf}` : `${v}${m.unit && m.unit !== 'vs par' ? ' ' + m.unit : ''}` };
 }
 
+/* Club distances measured with the scorecard's GPS shot tool. */
+function measuredClubs() {
+  const by = {}; (App.state.shotLog || []).forEach(s => { (by[s.club] = by[s.club] || []).push(s.yards); });
+  return Object.entries(by).map(([club, ys]) => {
+    const sorted = ys.slice().sort((a, b) => a - b);
+    // typical distance: average of the middle 80% so a topped shot or a freak bounce doesn't skew it
+    const trim = Math.floor(sorted.length * 0.1); const mid = sorted.slice(trim, sorted.length - trim || undefined);
+    return { club, n: ys.length, typical: Math.round(avg(mid)), longest: sorted[sorted.length - 1] };
+  }).sort((a, b) => b.typical - a.typical);
+}
+function measuredClubsCard() {
+  const m = measuredClubs();
+  return `<div class="mt"><h3>Measured on the course</h3>${m.length ? `<div class="table-wrap"><table><thead><tr><th>Club</th><th class="num">Shots</th><th class="num">Typical</th><th class="num">Longest</th><th class="num">Your chart</th><th></th></tr></thead><tbody>${m.map(r => { const c = App.state.clubs.find(x => x.club === r.club); return `<tr><td><strong>${escapeHtml(r.club)}</strong></td><td class="num">${r.n}</td><td class="num"><strong>${r.typical}</strong></td><td class="num">${r.longest}</td><td class="num">${c ? c.carry : '—'}</td><td>${c && r.n >= 3 && Math.abs(c.carry - r.typical) >= 5 ? `<button class="btn sm" data-action="useMeasured" data-club="${escapeHtml(r.club)}" data-yds="${r.typical}">Use ${r.typical}</button>` : ''}</td></tr>`; }).join('')}</tbody></table></div>
+    <p class="tiny muted mb0">From GPS shots on the live scorecard. These include roll, so they run a little longer than carry; after 3+ shots you can copy the typical number to your chart.</p>`
+    : '<p class="small muted mb0">On the live scorecard, pick a club before measuring a shot and your real distances build up here.</p>'}</div>`;
+}
+
 function drillModal(d) {
   const fav = App.state.favorites.includes(d.id);
   return `<div class="drill-detail"><span class="tag ${d.category}">${categoryLabel(d.category)}</span><h2 class="mt">${escapeHtml(d.name)}</h2>
@@ -490,7 +507,8 @@ Views.clubs = function () {
   let html = `<div class="page-head"><div><h1>My Clubs</h1><p class="muted">Know your real carry distances (average, not best ever). Use a launch monitor, a range with accurate markers, or the Three-Club Distance Windows drill.</p></div></div>`;
   html += `<div class="grid grid-2"><div class="card"><div class="card-head"><h3>Carry distances</h3><button class="btn sm" data-action="addClub">+ Club</button></div>
     ${sorted.map((c) => { const i = clubs.indexOf(c); const next = sorted[sorted.indexOf(c) + 1]; const gap = next ? c.carry - next.carry : null; return `<div class="gap-row"><input class="club" value="${escapeHtml(c.club)}" data-change="clubName" data-i="${i}" style="width:60px;font:inherit;font-weight:700;border:0;background:transparent;color:inherit"><div class="bar"><span style="width:${pct(c.carry, max)}%"></span></div><input class="yds" type="number" value="${c.carry}" data-change="clubCarry" data-i="${i}" style="width:64px;font:inherit;border:1px solid var(--border);border-radius:6px;padding:2px 4px;background:var(--surface);color:inherit"><span class="gap ${gap != null && (gap > 15 || gap < 6) ? 'warn' : ''}">${gap != null ? 'gap ' + gap : ''}</span><button class="btn sm ghost danger" data-action="removeClub" data-i="${i}">✕</button></div>`; }).join('')}
-    <p class="tiny muted mt mb0">Gaps of 10–15 yds between clubs are ideal. A gap over 15 yds (highlighted) means a distance you cannot hit with a full swing; a gap under 6 means two clubs doing the same job.</p></div>
+    <p class="tiny muted mt mb0">Gaps of 10–15 yds between clubs are ideal. A gap over 15 yds (highlighted) means a distance you cannot hit with a full swing; a gap under 6 means two clubs doing the same job.</p>
+    ${measuredClubsCard()}</div>
   <div><div class="card"><h3>Club selector</h3><form class="form" data-form="clubQuery"><div class="form-row">
       <div class="field"><label>Distance to target (yds)</label><input type="number" name="dist" value="${q.dist || 150}" required></div>
       <div class="field"><label>Wind (mph, + into / − down)</label><input type="number" name="wind" value="${q.wind || 0}"></div>

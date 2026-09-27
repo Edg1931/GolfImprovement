@@ -201,17 +201,44 @@ function playLive(lr) {
     ${i === last && !complete ? `<p class="tiny muted mb0">Enter a score on every hole to finish. Missing: ${lr.holes.map((x, k) => x.strokes == null ? no(k) : null).filter(Boolean).join(', ')}.</p>` : ''}
   </div>
 
-  <div><div class="card"><div class="card-head"><h3>Shot distance</h3><span class="tag">GPS</span></div>
-      <p class="small muted">Tap <em>Mark</em> where you hit from, walk to your ball, then tap <em>Measure</em>.</p>
-      <div class="gps-read">${gps.last != null ? `<span class="big">${gps.last}</span> yds` : gps.start ? '<span class="muted">Marked. Walk to your ball…</span>' : '<span class="muted">—</span>'}</div>
+  <div>${greenCard(lr, first + i)}
+    <div class="card mt"><div class="card-head"><h3>Shot distance</h3><span class="tag">GPS</span></div>
+      <p class="small muted">Pick the club, tap <em>Mark</em> where you hit from, walk to your ball, then tap <em>Measure</em>. Shots build your real distances in My Clubs.</p>
+      <div class="field mb"><label>Club</label><select data-change="gpsClub"><option value="">Not recorded</option>${App.state.clubs.map(c => `<option ${gps.club === c.club ? 'selected' : ''}>${escapeHtml(c.club)}</option>`).join('')}</select></div>
+      <div class="gps-read">${gps.last != null ? `<span class="big">${gps.last}</span> yds${gps.lastClub ? ' <span class="muted">· ' + escapeHtml(gps.lastClub) + '</span>' : ''}` : gps.start ? '<span class="muted">Marked. Walk to your ball…</span>' : '<span class="muted">—</span>'}</div>
       <div class="btn-row"><button class="btn primary" data-action="gpsMark">📍 Mark</button><button class="btn" data-action="gpsMeasure" ${gps.start ? '' : 'disabled'}>📏 Measure</button></div>
-      ${gps.shots && gps.shots.length ? `<p class="small mt mb0">This round: ${gps.shots.slice(-6).map(s => `<span class="badge neutral">${s} yds</span>`).join(' ')}</p>` : ''}
-      <p class="tiny muted mt mb0">Phone GPS is accurate to about 3–5 yds in open sky.</p></div>
+      ${gps.shots && gps.shots.length ? `<p class="small mt mb0">This round: ${gps.shots.slice(-6).map(s => `<span class="badge neutral">${s.club ? escapeHtml(s.club) + ' ' : ''}${s.yards} yds</span>`).join(' ')}</p>` : ''}
+      <p class="tiny muted mt mb0">Phone GPS is accurate to about 3–5 yds in open sky. Measured distance includes roll.</p></div>
     <div class="card mt"><h3>Scorecard</h3>${scorecardTable(lr.holes, lr.pars, cardSi, first)}</div>
     <div class="card mt"><h3>Round notes</h3><textarea class="notes-box" rows="3" data-change="liveNotes" placeholder="Conditions, what worked, what cost you strokes…">${escapeHtml(lr.notes || '')}</textarea></div>
     ${lr.editingId ? '' : '<div class="btn-row mt"><button class="btn ghost danger sm" data-action="discardRound">Discard round</button></div>'}
   </div></div>`;
   return html;
+}
+
+/* Green yardages for a hole: live front/middle/back distances once pins are saved for the course. */
+function greenCard(lr, hole) {
+  const course = lr.courseId && App.state.courses.find(c => c.id === lr.courseId);
+  const g = course && course.greens && course.greens[hole];
+  if (!course) return `<div class="card"><div class="card-head"><h3>Green yardages</h3><span class="tag">GPS</span></div><p class="small muted mb0">Save the course to your library to record greens and get front, middle and back yardages.</p></div>`;
+  const spots = [['front', 'Front'], ['center', 'Middle'], ['back', 'Back']];
+  const pinBtns = spots.map(([k, l]) => `<button class="btn sm ${g && g[k] ? '' : 'primary'}" data-action="greenPin" data-hole="${hole}" data-spot="${k}">${g && g[k] ? '✓ ' : ''}${l}</button>`).join('');
+  if (!g || !g.center) return `<div class="card"><div class="card-head"><h3>Green yardages</h3><span class="tag">GPS</span></div>
+    <p class="small">No green saved for hole ${hole + 1} yet. When you reach the green, stand on the ${g && (g.front || g.back) ? 'middle' : 'front edge, middle and back edge'} and tap the matching button. You only do this once per course.</p>
+    <div class="btn-row">${pinBtns}</div></div>`;
+  App.after(() => updateGreenYards());
+  return `<div class="card green-card"><div class="card-head"><h3>Green · hole ${hole + 1}</h3><button class="btn sm ${App.ui.liveYds ? 'primary' : ''}" data-action="liveYardage">${App.ui.liveYds ? '● Live' : 'Start live yardage'}</button></div>
+    <div class="yds-row" id="greenYds" data-hole="${hole}">${spots.map(([k, l]) => `<div class="yds ${k}"><span class="yds-num" data-spot="${k}">${g[k] ? '—' : '·'}</span><span class="yds-lbl">${l}</span></div>`).join('')}</div>
+    <p class="tiny muted mb0" id="greenAcc">${App.ui.liveYds ? 'Getting your position…' : 'Tap Start for live distances as you walk.'}</p>
+    ${!g.front || !g.back ? `<div class="btn-row mt"><span class="small muted">Add the</span>${spots.filter(([k]) => !g[k]).map(([k, l]) => `<button class="btn sm primary" data-action="greenPin" data-hole="${hole}" data-spot="${k}">${l.toLowerCase()} edge</button>`).join('')}</div>` : ''}
+    <details class="mt"><summary class="small muted">Re-mark this green</summary><div class="btn-row mt">${pinBtns}<button class="btn sm ghost danger" data-action="clearGreen" data-hole="${hole}">Clear</button></div></details></div>`;
+}
+function updateGreenYards() {
+  const box = document.getElementById('greenYds'); const pos = App._lastPos; if (!box || !pos) return;
+  const lr = App.state.liveRound; const course = lr && App.state.courses.find(c => c.id === lr.courseId);
+  const g = course && course.greens && course.greens[parseInt(box.dataset.hole, 10)]; if (!g) return;
+  box.querySelectorAll('.yds-num').forEach(el => { const p = g[el.dataset.spot]; el.textContent = p ? Math.round(yardsBetween(pos, p)) : '·'; });
+  const acc = document.getElementById('greenAcc'); if (acc) acc.textContent = `Live · accurate to about ±${Math.max(1, Math.round(pos.acc * 1.09))} yds`;
 }
 
 /* Compact scorecard table: two nines for 18 holes, one for a nine-hole round (first = 0 or 9). */
@@ -352,8 +379,27 @@ Object.assign(Actions, {
   },
   gpsMeasure() {
     const g = App.ui.gps; if (!g || !g.start) return;
-    App.locate(pos => { const y = Math.round(yardsBetween(g.start, pos)); g.last = y; g.shots = (g.shots || []).concat(y); g.start = pos; App.render(); });
+    App.locate(pos => {
+      const y = Math.round(yardsBetween(g.start, pos)); g.last = y; g.lastClub = g.club || '';
+      g.shots = (g.shots || []).concat({ yards: y, club: g.club || '' }); g.start = pos;
+      if (g.club && y >= 5 && y <= 400) { App.state.shotLog.push({ id: uid(), date: todayISO(), club: g.club, yards: y }); Store.save(); }
+      App.render();
+    });
   },
+  /* Save the player's current position as the front, middle or back of this hole's green. */
+  greenPin(el) {
+    const lr = App.state.liveRound; const course = lr && App.state.courses.find(c => c.id === lr.courseId); if (!course) return;
+    const hole = parseInt(el.dataset.hole, 10), spot = el.dataset.spot;
+    App.locate(pos => {
+      course.greens = course.greens || {}; course.greens[hole] = Object.assign({}, course.greens[hole], { [spot]: { lat: pos.lat, lon: pos.lon } });
+      Store.save(); App.render(); App.toast(`Saved the ${spot === 'center' ? 'middle' : spot} of green ${hole + 1}`);
+    });
+  },
+  clearGreen(el) {
+    const lr = App.state.liveRound; const course = lr && App.state.courses.find(c => c.id === lr.courseId); if (!course || !course.greens) return;
+    if (!confirm('Clear the saved pins for this green?')) return; delete course.greens[parseInt(el.dataset.hole, 10)]; Store.save(); App.render();
+  },
+  liveYardage() { App.ui.liveYds = !App.ui.liveYds; App.watchGps(App.ui.liveYds); App.render(); },
 });
 
 Object.assign(Forms, {
@@ -425,6 +471,7 @@ Object.assign(Forms, {
 });
 
 Object.assign(Changes, {
+  gpsClub(el) { App.ui.gps = Object.assign(App.ui.gps || {}, { club: el.value }); },
   liveNotes(el) { if (App.state.liveRound) { App.state.liveRound.notes = el.value; Store.save(); } },
   playCourse(el) { App.ui.playCourse = el.value || null; App.ui.playHoles = null; App.render(); },
   roundCourse(el) { App.ui.roundCourse = el.value || null; App.render(); },

@@ -98,7 +98,7 @@ const App = {
     this.afterHooks = [];
     const host = document.getElementById('view');
     const changed = route !== this._lastRoute; this._lastRoute = route;
-    if (route !== 'play') this.keepAwake(false);
+    if (route !== 'play') { this.keepAwake(false); if (this.ui.liveYds) { this.ui.liveYds = false; this.watchGps(false); } }
     if (!changed) host.classList.remove('enter');   // only animate real page changes, not in-page updates
     try { host.innerHTML = view(); } catch (e) { console.error(e); host.innerHTML = `<div class="callout warn">Something went wrong rendering this page: ${escapeHtml(e.message)}</div>`; }
     document.querySelectorAll('[data-route]').forEach(a => { const on = a.dataset.route === route || (a.dataset.also || '').split(' ').includes(route); a.classList.toggle('active', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
@@ -134,8 +134,21 @@ const App = {
     if (this._lock || !navigator.wakeLock || document.visibilityState !== 'visible') return;
     navigator.wakeLock.request('screen').then(l => { this._lock = l; l.addEventListener('release', () => { this._lock = null; }); }).catch(() => {});
   },
+  /* Continuous GPS for live green yardages. */
+  watchGps(on) {
+    if (this._watchId != null) { navigator.geolocation.clearWatch(this._watchId); this._watchId = null; }
+    if (!on || !navigator.geolocation) return;
+    this._watchId = navigator.geolocation.watchPosition(p => { this._lastPos = { lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy }; this._lastPosAt = Date.now(); updateGreenYards(); },
+      e => {
+        // only a refused permission is fatal; timeouts and lost signal are normal on a course, so keep watching
+        if (e.code === 1) { this.toast('Allow location access for live yardage'); this.ui.liveYds = false; this.watchGps(false); this.render(); return; }
+        const acc = document.getElementById('greenAcc'); if (acc) acc.textContent = 'Weak GPS signal… showing your last position';
+      }, { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 });
+  },
   locate(cb) {
     if (!navigator.geolocation) { this.toast('GPS is not available on this device'); return; }
+    // live yardage already has a fresh fix: use it straight away
+    if (this._watchId != null && this._lastPos && Date.now() - this._lastPosAt < 5000) { cb(this._lastPos); return; }
     this.toast('Getting your position…');
     navigator.geolocation.getCurrentPosition(p => cb({ lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy }),
       e => this.toast(e.code === 1 ? 'Allow location access to measure shots' : 'Could not get a GPS fix. Try again in open sky.'),
@@ -231,6 +244,7 @@ const Actions = {
   resetRoutine() { App.state.routine = DEFAULT_ROUTINE.slice(); Store.save(); App.render(); },
   addRoutineStep() { App.state.routine.push(''); Store.save(); App.render(); },
   removeRoutineStep(el) { App.state.routine.splice(parseInt(el.dataset.i, 10), 1); Store.save(); App.render(); },
+  useMeasured(el) { const c = App.state.clubs.find(x => x.club === el.dataset.club); if (!c) return; c.carry = parseInt(el.dataset.yds, 10); Store.save(); App.render(); App.toast(`${c.club} set to ${c.carry} yds`); },
   addClub() { App.state.clubs.push({ club: 'New', carry: 100 }); Store.save(); App.render(); },
   removeClub(el) { App.state.clubs.splice(parseInt(el.dataset.i, 10), 1); Store.save(); App.render(); },
   randomDrill() { const cat = document.getElementById('randCat').value; App.ui.randCat = cat; const pool = cat === 'all' ? DRILLS : drillsByCategory(cat); App.ui.randDrill = pool[Math.floor(Math.random() * pool.length)].id; App.render(); },

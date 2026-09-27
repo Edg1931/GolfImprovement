@@ -19,6 +19,7 @@ const Store = {
       courses: [],       // {id, name, tees, rating, slope, pars:[18], si:[18]}
       liveRound: null,   // in-progress hole-by-hole round (see scorecard.js)
       settings: { theme: '' },  // '' follows the system setting
+      shotLog: [],       // {id, date, club, yards} GPS-measured shots
       deleted: {},       // {id: isoDate} tombstones so deletions sync across devices
       meta: { updatedAt: '' },
     };

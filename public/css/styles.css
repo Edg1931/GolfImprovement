@@ -571,6 +571,13 @@ canvas.spark { width: 110px; height: 30px; display: block; }
 .ai-head { font-size: .72rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--gold); margin-bottom: 6px; }
 .ai-box p:last-child { margin-bottom: 0; }
 
+.yds-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 4px 0 10px; }
+.yds { display: flex; flex-direction: column; align-items: center; padding: 10px 4px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); }
+.yds.center { background: var(--green-100); border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+.yds-num { font-family: var(--display); font-size: 2.2rem; font-weight: 600; line-height: 1.05; font-variant-numeric: tabular-nums lining-nums; }
+.yds.center .yds-num { font-size: 2.8rem; color: var(--accent); }
+.yds-lbl { font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: var(--text-muted); }
+
 /* ---------- Course search ---------- */
 .search-row { display: flex; gap: 8px; }
 .search-row input { flex: 1; min-width: 0; font: inherit; padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); min-height: 44px; }

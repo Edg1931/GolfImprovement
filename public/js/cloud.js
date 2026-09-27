@@ -2,7 +2,7 @@
    Local data stays the source of truth while offline; changes are pushed a moment after each save and
    merged with the cloud copy when both sides changed, so nothing is lost across devices. */
 
-const SYNC_ARRAYS = ['rounds', 'sessions', 'assessments', 'courses'];
+const SYNC_ARRAYS = ['rounds', 'sessions', 'assessments', 'courses', 'shotLog'];
 
 /* Merge two app states. Items in the synced arrays are unioned by id (the newer document wins a clash),
    deletions are carried as tombstones in `deleted`, and everything else comes from the newer document. */
