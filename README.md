@@ -1,0 +1,48 @@
+# Fairway Lab — Golf Improvement Hub
+
+A complete, self-contained website for lowering your handicap. No build step, no server, no accounts: open `index.html` in a browser or deploy it to Vercel. All data is stored in your browser (with JSON export/import for backups).
+
+## What's inside
+
+| Page | What it does |
+| --- | --- |
+| **Dashboard** | Handicap Index, trend chart, progress to target, this week's sessions, top three stroke-loss areas, 12-week program status |
+| **Rounds & Handicap** | Log rounds with stats. Calculates score differentials and your Handicap Index using the World Handicap System (best 8 of last 20, with the official table for fewer rounds) |
+| **Stats & Stroke Loss** | Compares your averages (putts, GIR, fairways, scrambling, penalties, doubles) to benchmark data for your target handicap and ranks where you lose strokes, with drills for each |
+| **Practice Log** | Log sessions and drill scores. Shows practice balance vs the recommended split for your level, streaks, and history |
+| **Skills Test** | Nine 10-ball tests (3 ft / 6 ft / lag putts, chips, pitches, bunker, 80 yd wedge, 7-iron, driver) with tier benchmarks, a radar chart, history and targeted drills |
+| **Practice Schedule** | Weekly schedules for four handicap tiers × three time budgets, with tick-off tracking per week, plus a 12-week Foundation → Build → Perform program |
+| **Drill Library** | 54 drills across putting, chipping, pitching, bunker, irons, driver, on-course games, mental game and fitness. Every drill has setup, steps, a measurable goal and a pro tip. Search, filter, favourite, start a timer or log it |
+| **Playbook** | Course strategy, mental game (with an editable pre-shot routine), a 45-minute tournament warm-up, a fitness program, and a glossary |
+| **My Clubs** | Carry distances with gap analysis, a club selector that adjusts for wind, elevation and conditions, and a wedge distance matrix |
+| **Goals** | Target index and date, required pace, milestones with what each level typically looks like, and a commitments checklist |
+| **Tools** | Practice timer, random drill picker, course handicap calculator, Stableford/net calculator, data export/import, demo data |
+
+## Running it
+
+- **Locally:** open `index.html` in any modern browser. Nothing to install.
+- **Vercel:** import this repository in Vercel with Framework Preset **Other**, no build command, and the output directory left as the repo root. Vercel serves `index.html` as a static site.
+- **Try it with data:** go to *Tools → Load demo data* to see every page populated.
+
+## Structure
+
+```
+./
+  index.html          app shell and navigation
+  css/styles.css      design tokens, light/dark themes, responsive layout
+  js/data/drills.js   drill library
+  js/data/plans.js    tiers, session templates, weekly layouts, 12-week program
+  js/data/content.js  benchmarks, skills tests, strategy, mental, warm-up, fitness, glossary
+  js/store.js         localStorage persistence and helpers
+  js/handicap.js      WHS index maths, stats aggregation, stroke-loss analysis
+  js/charts.js        dependency-free canvas charts (line, bar, radar)
+  js/views.js         page renderers
+  js/app.js           router, actions, forms, timer, demo data
+```
+
+Plain scripts (no modules or bundler) so the site works from a `file://` URL as well as a web server.
+
+## Notes on the numbers
+
+- Handicap maths follows the WHS: differential = (113 ÷ slope) × (adjusted gross − course rating); index from the standard table (1 best −2 with 3 rounds … best 8 of 20). Course handicap = index × (slope ÷ 113) + (rating − par).
+- Benchmarks by handicap are approximate averages drawn from published shot-tracking data. The stroke-loss figures are estimates meant for ranking your focus areas, not a strokes-gained calculation.

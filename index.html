@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fairway Lab — Golf Improvement Hub</title>
+  <meta name="description" content="Track your handicap, follow structured practice schedules, run measurable drills, test your skills, and lower your scores." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%231f5f3f'/><circle cx='50' cy='50' r='26' fill='%23f6f1e7'/><circle cx='41' cy='42' r='4' fill='%23d8d0c0'/><circle cx='58' cy='42' r='4' fill='%23d8d0c0'/><circle cx='50' cy='56' r='4' fill='%23d8d0c0'/></svg>" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <a class="skip-link" href="#view">Skip to content</a>
+  <div class="app">
+    <header class="topbar">
+      <button class="icon-btn menu-btn" id="menuBtn" aria-label="Toggle navigation">☰</button>
+      <a class="brand" href="#/dashboard">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-text">Fairway Lab</span>
+      </a>
+      <div class="topbar-right">
+        <span class="index-pill" id="topIndex" title="Current Handicap Index">HI —</span>
+        <button class="icon-btn" id="themeBtn" aria-label="Toggle dark mode">◐</button>
+      </div>
+    </header>
+
+    <nav class="sidebar" id="sidebar" aria-label="Main navigation">
+      <ul class="nav-list">
+        <li><a href="#/dashboard" data-route="dashboard"><span class="nav-ico">⌂</span>Dashboard</a></li>
+        <li class="nav-group">Track</li>
+        <li><a href="#/rounds" data-route="rounds"><span class="nav-ico">⛳</span>Rounds &amp; Handicap</a></li>
+        <li><a href="#/stats" data-route="stats"><span class="nav-ico">▤</span>Stats &amp; Stroke Loss</a></li>
+        <li><a href="#/sessions" data-route="sessions"><span class="nav-ico">✎</span>Practice Log</a></li>
+        <li><a href="#/assessment" data-route="assessment"><span class="nav-ico">◎</span>Skills Test</a></li>
+        <li class="nav-group">Improve</li>
+        <li><a href="#/plan" data-route="plan"><span class="nav-ico">▦</span>Practice Schedule</a></li>
+        <li><a href="#/drills" data-route="drills"><span class="nav-ico">⚑</span>Drill Library</a></li>
+        <li><a href="#/playbook" data-route="playbook"><span class="nav-ico">☰</span>Playbook</a></li>
+        <li><a href="#/clubs" data-route="clubs"><span class="nav-ico">⟟</span>My Clubs</a></li>
+        <li><a href="#/goals" data-route="goals"><span class="nav-ico">★</span>Goals</a></li>
+        <li><a href="#/tools" data-route="tools"><span class="nav-ico">⚙</span>Tools</a></li>
+      </ul>
+      <div class="sidebar-foot">
+        <p class="muted small">Data is stored in this browser only. Export a backup from <a href="#/tools">Tools</a>.</p>
+      </div>
+    </nav>
+    <div class="scrim" id="scrim"></div>
+
+    <main class="view" id="view" tabindex="-1"></main>
+  </div>
+
+  <div class="toast-host" id="toastHost" aria-live="polite"></div>
+
+  <script src="js/data/drills.js"></script>
+  <script src="js/data/plans.js"></script>
+  <script src="js/data/content.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/handicap.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/views.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
