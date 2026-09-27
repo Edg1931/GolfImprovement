@@ -62,7 +62,7 @@ function announceAchievements(before) {
   achievements().filter(a => a.done && !before.includes(a.id)).forEach((a, i) => setTimeout(() => App.toast(a.icon + ' Achievement: ' + a.name), 400 + i * 900));
 }
 function achievementGrid(list) {
-  return `<div class="badge-grid">${list.map(a => `<div class="ach ${a.done ? 'on' : ''}" title="${escapeHtml(a.desc)}"><span class="ach-ico" aria-hidden="true">${a.icon}</span><div><strong>${escapeHtml(a.name)}</strong><div class="tiny muted">${escapeHtml(a.desc)}</div></div></div>`).join('')}</div>`;
+  return `<div class="badge-grid">${list.map(a => `<div class="ach ${a.done ? 'on' : ''}" title="${escapeHtml(a.desc)}${a.done ? ' · tap to share' : ''}" ${a.done ? `data-action="shareAchievement" data-id="${a.id}" role="button" tabindex="0"` : ''}><span class="ach-ico" aria-hidden="true">${a.icon}</span><div><strong>${escapeHtml(a.name)}</strong><div class="tiny muted">${escapeHtml(a.desc)}</div></div></div>`).join('')}</div>`;
 }
 
 /* ---------- Play view ---------- */
@@ -302,7 +302,7 @@ function roundCardModal(r) {
     ${s ? `<p class="small mt mb0">${s.dist.eagle + s.dist.birdie} birdies or better · ${s.dist.par} pars · ${s.dist.bogey} bogeys · ${s.dist.double + s.dist.triple} doubles+</p>` : ''}
     ${r.notes ? `<p class="small mt mb0"><strong>Notes:</strong> ${escapeHtml(r.notes)}</p>` : ''}
     ${aiBox(r)}
-    <div class="btn-row mt"><button class="btn" data-action="editRound" data-id="${r.id}">✎ Edit round</button></div>`;
+    <div class="btn-row mt"><button class="btn" data-action="shareRound" data-id="${r.id}">↗ Share</button><button class="btn" data-action="editRound" data-id="${r.id}">✎ Edit round</button></div>`;
 }
 
 /* ---------- Actions for the scorecard ---------- */
@@ -345,7 +345,7 @@ Object.assign(Actions, {
       <div class="stat-row mb">${statBox('Differential', fmt1(r.diff))}${statBox('Index', idx != null ? fmt1(idx) : '—', prevIdx != null && idx != null && idx !== prevIdx ? (idx < prevIdx ? '▼ ' : '▲ ') + fmt1(Math.abs(idx - prevIdx)) : '')}${statBox('Putts', r.putts ?? '—')}${statBox('GIR', r.gir ?? '—')}</div>
       ${scorecardTable(r.holes, r.pars, r.si, r.firstHole)}
       ${aiBox(r)}
-      <div class="btn-row mt"><button class="btn primary" data-action="closeModal">Done</button><button class="btn" data-action="goto" data-href="#/stats">See stats</button></div>`);
+      <div class="btn-row mt"><button class="btn primary" data-action="closeModal">Done</button><button class="btn" data-action="shareRound" data-id="${r.id}">↗ Share</button><button class="btn" data-action="goto" data-href="#/stats">See stats</button></div>`);
     announceAchievements(before);
   },
   /* Reopen a saved round: hole-by-hole rounds go back into the scorecard, quick-logged ones get a form. */

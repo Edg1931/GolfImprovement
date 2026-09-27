@@ -431,6 +431,7 @@ canvas.chart.tall { height: 300px; }
 .ach { display: flex; gap: 12px; align-items: center; padding: 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); }
 .ach .ach-ico { width: 42px; height: 42px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; background: var(--surface); border: 1px solid var(--border); filter: grayscale(1); opacity: .5; flex-shrink: 0; }
 .ach:not(.on) strong { color: var(--text-muted); }
+.ach.on[data-action] { cursor: pointer; }
 .ach.on { background: linear-gradient(135deg, var(--gold-soft), var(--surface) 80%); border-color: color-mix(in srgb, var(--gold) 40%, var(--border)); }
 .ach.on .ach-ico { filter: none; opacity: 1; box-shadow: 0 4px 10px -4px rgba(195, 154, 43, .6); }
 

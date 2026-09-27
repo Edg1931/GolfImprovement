@@ -1,10 +1,10 @@
 /* Offline support: app shell is cached on install; everything else is served
    network-first and cached as it is fetched, so the app works on the course with no signal. */
-const CACHE = 'fairwaylab-v4';
+const CACHE = 'fairwaylab-v5';
 const SHELL = [
   './', 'index.html', 'css/styles.css', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png',
   'js/data/drills.js', 'js/data/plans.js', 'js/data/content.js', 'js/store.js', 'js/handicap.js',
-  'js/charts.js', 'js/views.js', 'js/app.js', 'js/scorecard.js', 'js/config.js', 'js/cloud.js', 'js/social.js', 'js/vendor/supabase.js',
+  'js/charts.js', 'js/views.js', 'js/app.js', 'js/scorecard.js', 'js/config.js', 'js/cloud.js', 'js/social.js', 'js/share.js', 'js/vendor/supabase.js',
 ];
 
 self.addEventListener('install', e => {
