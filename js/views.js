@@ -41,8 +41,13 @@ Views.dashboard = function () {
   const recs = recommendDrills(analysis, 2);
   const prog = App.programWeek();
 
-  let html = `<div class="page-head"><div><h1>Dashboard</h1><p class="muted">${p.name ? 'Welcome back, ' + escapeHtml(p.name) + '.' : 'Your golf improvement hub.'} ${rounds.length ? rounds.length + ' round' + (rounds.length > 1 ? 's' : '') + ' logged.' : ''}</p></div>
-    <div class="btn-row"><a class="btn primary" href="#/rounds">+ Log round</a><a class="btn" href="#/sessions">+ Log practice</a></div></div>`;
+  const hour = new Date().getHours(); const greet = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const todayName = DAYS[(new Date().getDay() + 6) % 7]; const today = plan.find(d => d.day === todayName);
+  const ach = achievements(); const achDone = ach.filter(a => a.done);
+  const lr = App.state.liveRound;
+  let html = `<div class="page-head"><div><p class="eyebrow">${new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}</p><h1>${greet}${p.name ? ', ' + escapeHtml(p.name) : ''}</h1><p class="muted">${rounds.length ? rounds.length + ' round' + (rounds.length > 1 ? 's' : '') + ' logged · ' + achDone.length + '/' + ach.length + ' achievements' : 'Your golf improvement hub.'}</p></div>
+    <div class="btn-row"><a class="btn primary" href="#/play">⛳ Play a round</a><a class="btn" href="#/rounds">+ Log round</a><a class="btn" href="#/sessions">+ Log practice</a></div></div>`;
+  if (lr) { const t = liveTotals(lr); html += `<a class="resume card" href="#/play"><span class="pulse" aria-hidden="true"></span><div><strong>Round in progress · ${escapeHtml(lr.course)}</strong><div class="small muted">Thru ${t.thru} · ${t.thru ? toPar(t.toPar) : 'E'} · tap to resume on hole ${lr.cur + 1}</div></div><span class="btn primary sm">Resume ›</span></a>`; }
   if (!rounds.length) html += onboarding();
 
   html += `<div class="hero">
@@ -55,6 +60,16 @@ Views.dashboard = function () {
     ${rounds.length ? `<div class="kv mt small"><dt>Rounds counting</dt><dd>${App.countedDiffs().length} best of last ${Math.min(rounds.length, 20)}</dd><dt>Low differential</dt><dd>${fmt1(Math.min(...rounds.slice(0, 20).map(r => r.diff)))}</dd><dt>Level</dt><dd>${tier.label} (${tier.range})</dd>${prog ? `<dt>Program</dt><dd>Week ${prog.week} of 12</dd>` : ''}</div>` : ''}
     </div>
     <div class="card"><div class="card-head"><h3>Index trend</h3><a class="small" href="#/rounds">All rounds</a></div><canvas class="chart" id="dashIndexChart"></canvas></div>
+  </div>`;
+
+  html += `<div class="grid grid-2 mt"><div class="card today"><div class="card-head"><h3>Today · ${todayName}</h3><a class="small" href="#/plan">Schedule</a></div>
+      ${today && today.session ? `<div class="today-body"><div><div class="today-title">${escapeHtml(today.session.name)}</div><p class="small muted mb0">${today.session.minutes} min · ${today.session.drills.map(([id, m]) => drillLink(id) + ` <span class="muted">${m}′</span>`).join(' · ')}</p></div>
+        <div class="btn-row">${checks[todayName] ? '<span class="badge good">✓ Done</span>' : `<button class="btn primary sm" data-action="startTodaySession" data-sid="${today.session.id}">Start session</button>`}</div></div>`
+      : `<p class="muted mb0">Rest day. Ten minutes of putting on the carpet or a mobility flow keeps the feel alive.</p>`}
+      ${prog ? `<p class="tiny muted mt mb0">Program week ${prog.week}: ${escapeHtml(PROGRAM.weekThemes[prog.week])}</p>` : ''}</div>
+    <div class="card"><div class="card-head"><h3>Achievements</h3><a class="small" href="#/goals">All ${ach.length}</a></div>
+      <div class="ach-strip">${ach.slice().sort((a, b) => b.done - a.done).slice(0, 8).map(a => `<span class="ach-chip ${a.done ? 'on' : ''}" title="${escapeHtml(a.name + ': ' + a.desc)}">${a.icon}</span>`).join('')}</div>
+      <p class="small muted mb0 mt">${achDone.length ? `${achDone.length} unlocked. Next up: <strong>${escapeHtml((ach.find(a => !a.done) || { name: 'all done!' }).name)}</strong> ${escapeHtml((ach.find(a => !a.done) || { desc: '' }).desc.toLowerCase())}.` : 'Log a round to unlock your first badge.'}</p></div>
   </div>`;
 
   html += `<div class="grid grid-4 mt">
@@ -80,7 +95,7 @@ Views.dashboard = function () {
       ${prog ? `<p><strong>Week ${prog.week} of 12</strong> · ${escapeHtml(prog.phase.name)}</p><div class="phase-bar">${[...Array(12)].map((_, i) => `<span class="${i < 4 ? 'p1' : i < 8 ? 'p2' : 'p3'} ${i + 1 === prog.week ? 'current' : ''}"></span>`).join('')}</div><p class="small muted mb0">This week: ${escapeHtml(PROGRAM.weekThemes[prog.week])}</p>` : `<p class="muted">Not started. The program structures 12 weeks into Foundation, Build and Perform phases.</p><button class="btn primary sm" data-action="startProgram">Start the 12-week program</button>`}
     </div>
     <div class="card"><div class="card-head"><h3>Recent rounds</h3><a class="small" href="#/rounds">All</a></div>
-      ${rounds.length ? `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Course</th><th class="num">Score</th><th class="num">Diff</th><th class="num">Putts</th></tr></thead><tbody>${rounds.slice(0, 5).map(r => `<tr><td>${fmtDate(r.date)}</td><td>${escapeHtml(r.course || '—')}</td><td class="num">${r.score}</td><td class="num">${fmt1(r.diff)}</td><td class="num">${r.putts != null ? r.putts : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">No rounds yet.</div>'}
+      ${rounds.length ? `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Course</th><th class="num">Score</th><th class="num">Diff</th><th class="num">Putts</th></tr></thead><tbody>${rounds.slice(0, 5).map(r => `<tr><td>${fmtDate(r.date)}</td><td>${escapeHtml(r.course || '—')}</td><td class="num">${r.grossScore ?? r.score}</td><td class="num">${fmt1(r.diff)}</td><td class="num">${r.putts != null ? r.putts : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">No rounds yet.</div>'}
     </div>
   </div>`;
 
@@ -95,7 +110,8 @@ Views.dashboard = function () {
 /* ---------- Rounds ---------- */
 Views.rounds = function () {
   const rounds = App.rounds(); const idx = App.index(); const p = App.state.profile;
-  const last = rounds[0] || {};
+  const saved = App.ui.roundCourse ? App.state.courses.find(c => c.id === App.ui.roundCourse) : null;
+  const last = saved ? { course: saved.name, tees: saved.tees, rating: saved.rating, slope: saved.slope, par: sum(saved.pars) } : (rounds[0] || {});
   const hist = indexHistory(rounds);
   let html = `<div class="page-head"><div><h1>Rounds &amp; Handicap</h1><p class="muted">Log every round with stats. Your Handicap Index follows the World Handicap System (best 8 of your last 20 differentials).</p></div></div>`;
   html += `<div class="grid grid-3">
@@ -104,8 +120,9 @@ Views.rounds = function () {
     <div class="card">${statBox('Avg score', rounds.length ? fmt1(avg(rounds.slice(0, 20).map(r => r.score))) : '—', 'last 20 rounds')}</div>
   </div>`;
 
-  html += `<div class="grid grid-2 mt"><div class="card"><h2>Log a round</h2>
+  html += `<div class="grid grid-2 mt"><div class="card"><div class="card-head"><h2>Log a round</h2><a class="btn sm" href="#/play">⛳ Score hole by hole</a></div>
   <form class="form" data-form="round">
+    ${App.state.courses.length ? `<div class="field"><label>Saved course</label><select data-change="roundCourse"><option value="">Type it in…</option>${App.state.courses.map(c => `<option value="${c.id}" ${saved && saved.id === c.id ? 'selected' : ''}>${escapeHtml(c.name)}${c.tees ? ' · ' + escapeHtml(c.tees) : ''}</option>`).join('')}</select></div>` : ''}
     <div class="form-row">
       <div class="field"><label>Date</label><input type="date" name="date" value="${todayISO()}" required></div>
       <div class="field"><label>Course</label><input name="course" value="${escapeHtml(last.course || p.homeCourse || '')}" placeholder="Course name"></div>
@@ -141,7 +158,7 @@ Views.rounds = function () {
 
   html += `<div class="card mt"><div class="card-head"><h2>Round history</h2><span class="muted small">${rounds.length} rounds</span></div>
     ${rounds.length ? `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Course</th><th class="num">Score</th><th class="num">Rating/Slope</th><th class="num">Diff</th><th class="num">Putts</th><th class="num">FIR</th><th class="num">GIR</th><th class="num">Pen</th><th class="num">U&amp;D</th><th></th></tr></thead><tbody>
-    ${rounds.map((r, i) => `<tr class="${i < 20 && App.countedDiffs().includes(r.id) ? 'highlight' : ''}"><td class="nowrap">${fmtDate(r.date)}</td><td>${escapeHtml(r.course || '—')}${r.notes ? `<div class="tiny muted">${escapeHtml(r.notes)}</div>` : ''}</td><td class="num"><strong>${r.score}</strong></td><td class="num">${r.rating}/${r.slope}</td><td class="num">${fmt1(r.diff)}</td><td class="num">${r.putts ?? '—'}</td><td class="num">${r.firHit != null ? r.firHit + '/' + r.firPossible : '—'}</td><td class="num">${r.gir ?? '—'}</td><td class="num">${r.penalties ?? '—'}</td><td class="num">${r.udAtt ? r.udMade + '/' + r.udAtt : '—'}</td><td><button class="btn sm ghost danger" data-action="deleteRound" data-id="${r.id}" title="Delete">✕</button></td></tr>`).join('')}
+    ${rounds.map((r, i) => `<tr class="${i < 20 && App.countedDiffs().includes(r.id) ? 'highlight' : ''}"><td class="nowrap">${fmtDate(r.date)}</td><td>${escapeHtml(r.course || '—')}${r.notes ? `<div class="tiny muted">${escapeHtml(r.notes)}</div>` : ''}</td><td class="num"><strong>${r.grossScore ?? r.score}</strong>${r.grossScore != null && r.grossScore !== r.score ? `<div class="tiny muted" title="Adjusted gross score used for handicap">adj ${r.score}</div>` : ''}</td><td class="num">${r.rating}/${r.slope}</td><td class="num">${fmt1(r.diff)}</td><td class="num">${r.putts ?? '—'}</td><td class="num">${r.firHit != null ? r.firHit + '/' + r.firPossible : '—'}</td><td class="num">${r.gir ?? '—'}</td><td class="num">${r.penalties ?? '—'}</td><td class="num">${r.udAtt ? r.udMade + '/' + r.udAtt : '—'}</td><td class="nowrap">${r.holes ? `<button class="btn sm" data-action="viewCard" data-id="${r.id}">Card</button>` : ''}<button class="btn sm ghost danger" data-action="deleteRound" data-id="${r.id}" title="Delete" aria-label="Delete round">✕</button></td></tr>`).join('')}
     </tbody></table></div><p class="tiny muted mt mb0">Highlighted rows are the differentials currently counting toward your index.</p>` : '<div class="empty">No rounds logged yet. Add your first round above.</div>'}
   </div>`;
 
@@ -191,6 +208,22 @@ Views.stats = function () {
       : '<div class="callout">You are at or better than the benchmark in every area we measure. Raise your target handicap on the Goals page to find the next gap.</div>'}
   </div>`;
 
+  const hb = holeBreakdown(rounds.slice(0, n));
+  if (hb) {
+    const missT = hb.miss.hit + hb.miss.left + hb.miss.right;
+    const side = missT ? (hb.miss.left > hb.miss.right * 1.5 ? 'left' : hb.miss.right > hb.miss.left * 1.5 ? 'right' : null) : null;
+    html += `<div class="card mt"><div class="card-head"><h2>Scoring breakdown</h2><span class="small muted">${hb.rounds} hole-by-hole round${hb.rounds > 1 ? 's' : ''} · ${hb.holes} holes</span></div>
+      <div class="grid grid-2"><div><canvas class="chart" id="distChart"></canvas></div>
+      <div><div class="stat-row">${statBox('Par 3s', hb.par3 != null ? toPar(Math.round(hb.par3 * 100) / 100) : '—', 'avg vs par')}${statBox('Par 4s', hb.par4 != null ? toPar(Math.round(hb.par4 * 100) / 100) : '—', 'avg vs par')}${statBox('Par 5s', hb.par5 != null ? toPar(Math.round(hb.par5 * 100) / 100) : '—', 'avg vs par')}</div>
+        ${hb.front != null ? `<div class="kv mt"><dt>Front nine</dt><dd>${toPar(Math.round(hb.front * 10) / 10)} avg</dd><dt>Back nine</dt><dd>${toPar(Math.round(hb.back * 10) / 10)} avg${hb.back - hb.front >= 1.5 ? ' <span class="badge warn">fades late</span>' : ''}</dd></div>` : ''}
+        ${missT ? `<h3 class="mt">Tee shot pattern</h3><div class="miss-bar"><span class="l" style="flex:${hb.miss.left || 0.001}">${pct(hb.miss.left, missT)}% L</span><span class="h" style="flex:${hb.miss.hit || 0.001}">${pct(hb.miss.hit, missT)}% hit</span><span class="r" style="flex:${hb.miss.right || 0.001}">${pct(hb.miss.right, missT)}% R</span></div>
+          <p class="small muted mt mb0">${side ? `Your misses go <strong>${side}</strong>. Aim down the ${side} edge of the fairway so a miss finishes in play, and see <a href="#" data-action="openDrill" data-id="fairway-gate">Fairway Gate</a>.` : 'Misses are balanced left and right: work on start line and strike, not aim.'}</p>` : ''}
+      </div></div></div>`;
+    App.after(() => { const c = document.getElementById('distChart'); if (c) Charts.bar(c, [['Birdie+', hb.dist.eagle + hb.dist.birdie, 'accent'], ['Par', hb.dist.par, 'accent'], ['Bogey', hb.dist.bogey, 'gold'], ['Double', hb.dist.double, 'red'], ['Triple+', hb.dist.triple, 'red']].map(([label, v, color]) => ({ label, value: Math.round(100 * v / hb.holes), color })), { suffix: '%' }); });
+  } else {
+    html += `<div class="callout info mt small"><strong>Want deeper stats?</strong> Rounds scored on the <a href="#/play">live scorecard</a> add a birdie/par/bogey breakdown, par-3/4/5 scoring, front vs back nine and your tee-shot miss pattern.</div>`;
+  }
+
   html += `<div class="grid grid-2 mt">
     <div class="card"><h3>Putts per round</h3><canvas class="chart" id="puttsChart"></canvas></div>
     <div class="card"><h3>Greens &amp; fairways</h3><canvas class="chart" id="girChart"></canvas></div>
@@ -214,8 +247,7 @@ Views.sessions = function () {
   const recent = sessions.filter(s => s.date >= sinceIso);
   const byType = {}; recent.forEach(s => { byType[s.type] = (byType[s.type] || 0) + (s.minutes || 0); });
   const total = Object.values(byType).reduce((a, b) => a + b, 0);
-  const weeks = {}; sessions.forEach(s => { const k = isoWeekKey(new Date(s.date + 'T00:00:00')); weeks[k] = (weeks[k] || 0) + 1; });
-  let streak = 0; { const d = new Date(); for (let i = 0; i < 52; i++) { const k = isoWeekKey(d); if (weeks[k] >= 2) streak++; else if (i > 0) break; d.setDate(d.getDate() - 7); } }
+  const streak = practiceStreak(sessions);
   const pending = App.ui.sessionDrills || [];
 
   let html = `<div class="page-head"><div><h1>Practice Log</h1><p class="muted">Log every session with the drill scores you hit. Numbers you track are numbers that improve.</p></div></div>`;
@@ -231,7 +263,7 @@ Views.sessions = function () {
       <div class="form-row">
         <div class="field"><label>Date</label><input type="date" name="date" value="${todayISO()}" required></div>
         <div class="field"><label>Minutes</label><input type="number" name="minutes" min="5" max="600" value="${pending.reduce((a, d) => a + (getDrill(d.id)?.minutes || 0), 0) || 45}" required></div>
-        <div class="field"><label>Type</label><select name="type">${SESSION_TYPES.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></div>
+        <div class="field"><label>Type</label><select name="type">${SESSION_TYPES.map(([v, l]) => `<option value="${v}" ${App.ui.sessionType === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
       </div>
       <fieldset><legend>Drills done</legend>
         <div class="form-row"><div class="field"><label>Add a drill</label><select id="drillPicker">${DRILL_CATEGORIES.map(c => `<optgroup label="${c.label}">${drillsByCategory(c.id).map(d => `<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('')}</optgroup>`).join('')}</select></div>
@@ -433,6 +465,8 @@ Views.goals = function () {
     html += `<div class="card mt"><h2>Milestones</h2><div class="table-wrap"><table><thead><tr><th>Index</th><th>By</th><th>What it typically takes</th></tr></thead><tbody>${ms.map((m, i) => { const frac = (idx - m) / plan.drop; const d = new Date(); d.setDate(d.getDate() + Math.round(plan.days * frac)); const bm = benchmarkFor(m); return `<tr><td><strong>${fmt1(m)}</strong></td><td>${d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</td><td class="small">Avg ~${bm.score}, ${fmt1(bm.putts)} putts, ${bm.gir}% GIR, ${bm.scrambling}% scrambling, ${fmt1(bm.doubles)} doubles</td></tr>`; }).join('')}</tbody></table></div></div>`;
   }
   if (b && st) html += `<div class="card mt"><h2>What a ${b.label} handicap looks like vs you</h2><div class="grid grid-4">${[['Putts', fmt1(st.putts), fmt1(b.putts)], ['GIR', st.girPct != null ? Math.round(st.girPct) + '%' : '—', b.gir + '%'], ['Scrambling', st.scrambling != null ? Math.round(st.scrambling) + '%' : '—', b.scrambling + '%'], ['Doubles+', fmt1(st.doubles), fmt1(b.doubles)]].map(([l, y, t]) => `<div class="card tight"><div class="stat"><span class="label">${l}</span><span class="value" style="font-size:1.3rem">${y} <span class="muted">→ ${t}</span></span></div></div>`).join('')}</div></div>`;
+  const ach = achievements();
+  html += `<div class="card mt"><div class="card-head"><h2>Achievements</h2><span class="small muted">${ach.filter(a => a.done).length}/${ach.length} unlocked</span></div>${achievementGrid(ach)}</div>`;
   html += `<div class="card mt"><div class="card-head"><h2>Commitments</h2><span class="small muted">${commitList.filter((_, i) => commits['c' + i]).length}/${commitList.length}</span></div><ul class="checklist">${commitList.map((c, i) => `<li><input type="checkbox" id="c${i}" data-change="commit" data-key="c${i}" ${commits['c' + i] ? 'checked' : ''}><label for="c${i}" class="${commits['c' + i] ? 'done' : ''}">${escapeHtml(c)}</label></li>`).join('')}</ul></div>`;
   return html;
 };

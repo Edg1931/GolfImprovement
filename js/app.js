@@ -16,10 +16,15 @@ const App = {
     document.addEventListener('keydown', e => { if (e.key === 'Escape') this.closeModal(); if (e.key === 'Enter' && e.target.matches('.drill-card')) e.target.click(); });
     document.getElementById('menuBtn').addEventListener('click', () => this.toggleMenu());
     document.getElementById('scrim').addEventListener('click', () => this.toggleMenu(false));
-    document.getElementById('themeBtn').addEventListener('click', () => { this.state.settings.theme = this.state.settings.theme === 'dark' ? 'light' : 'dark'; Store.save(); this.applyTheme(); this.render(); });
+    document.getElementById('themeBtn').addEventListener('click', () => { this.state.settings.theme = this.effectiveTheme() === 'dark' ? 'light' : 'dark'; Store.save(); this.applyTheme(); this.render(); });
+    this._darkQuery = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+    if (this._darkQuery && this._darkQuery.addEventListener) this._darkQuery.addEventListener('change', () => { if (!this.state.settings.theme) { this.applyTheme(); this.render(); } });
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && this._wantAwake) this.keepAwake(true); });
+    if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => { /* offline support unavailable */ });
     window.addEventListener('resize', () => { clearTimeout(this._rz); this._rz = setTimeout(() => this.runAfter(), 150); });
     if (!location.hash) location.hash = '#/dashboard';
     this.render();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => this.runAfter());   // redraw charts in the web font
   },
 
   /* ---------- derived data ---------- */
@@ -59,11 +64,19 @@ const App = {
     const route = this.route(); const view = Views[route] || Views.dashboard;
     this.afterHooks = [];
     const host = document.getElementById('view');
+    const changed = route !== this._lastRoute; this._lastRoute = route;
+    if (route !== 'play') this.keepAwake(false);
+    if (!changed) host.classList.remove('enter');   // only animate real page changes, not in-page updates
     try { host.innerHTML = view(); } catch (e) { console.error(e); host.innerHTML = `<div class="callout warn">Something went wrong rendering this page: ${escapeHtml(e.message)}</div>`; }
-    document.querySelectorAll('.nav-list a[data-route]').forEach(a => a.classList.toggle('active', a.dataset.route === route));
-    const idx = this.index(); document.getElementById('topIndex').textContent = idx != null ? 'HI ' + fmt1(idx) : 'HI —';
-    this.toggleMenu(false);
-    window.scrollTo({ top: 0 });
+    document.querySelectorAll('[data-route]').forEach(a => { const on = a.dataset.route === route || (a.dataset.also || '').split(' ').includes(route); a.classList.toggle('active', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+    const idx = this.index(); document.getElementById('topIndex').innerHTML = `<small>HI</small> ${idx != null ? fmt1(idx) : '—'}`;
+    document.getElementById('liveDot').classList.toggle('hidden', !this.state.liveRound);
+    if (changed) {
+      this.toggleMenu(false);
+      window.scrollTo({ top: 0 });
+      host.classList.remove('enter'); void host.offsetWidth; host.classList.add('enter');
+      const h1 = host.querySelector('h1'); document.title = (h1 && route !== 'dashboard' ? h1.textContent + ' · ' : '') + 'Fairway Lab';
+    }
     this.runAfter();
   },
   renderKeepFocus(el) {
@@ -72,11 +85,29 @@ const App = {
   },
   after(fn) { this.afterHooks.push(fn); },
   runAfter() { this.afterHooks.forEach(fn => { try { fn(); } catch (e) { console.error(e); } }); },
-  applyTheme() { document.documentElement.setAttribute('data-theme', this.state.settings.theme || 'light'); },
+  effectiveTheme() { return this.state.settings.theme || (this._darkQuery && this._darkQuery.matches ? 'dark' : 'light'); },
+  applyTheme() {
+    const t = this.effectiveTheme(); document.documentElement.setAttribute('data-theme', t);
+    const m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', t === 'dark' ? '#0c120e' : '#12352a');
+  },
+  /* Keep the screen on while a live round is open (where supported). */
+  keepAwake(on) {
+    this._wantAwake = on;
+    if (!on) { if (this._lock) { this._lock.release().catch(() => {}); this._lock = null; } return; }
+    if (this._lock || !navigator.wakeLock || document.visibilityState !== 'visible') return;
+    navigator.wakeLock.request('screen').then(l => { this._lock = l; l.addEventListener('release', () => { this._lock = null; }); }).catch(() => {});
+  },
+  locate(cb) {
+    if (!navigator.geolocation) { this.toast('GPS is not available on this device'); return; }
+    this.toast('Getting your position…');
+    navigator.geolocation.getCurrentPosition(p => cb({ lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy }),
+      e => this.toast(e.code === 1 ? 'Allow location access to measure shots' : 'Could not get a GPS fix. Try again in open sky.'),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+  },
   toggleMenu(force) { const open = force != null ? force : !document.getElementById('sidebar').classList.contains('open'); document.getElementById('sidebar').classList.toggle('open', open); document.getElementById('scrim').classList.toggle('open', open); },
-  toast(msg) { const h = document.getElementById('toastHost'); const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; h.appendChild(t); setTimeout(() => t.remove(), 2600); },
-  modal(html) { this.closeModal(); const m = document.createElement('div'); m.className = 'modal-host'; m.id = 'modalHost'; m.innerHTML = `<div class="modal" role="dialog" aria-modal="true"><button class="btn sm ghost close" data-action="closeModal" aria-label="Close">✕</button>${html}</div>`; m.addEventListener('click', e => { if (e.target === m) this.closeModal(); }); document.body.appendChild(m); },
-  closeModal() { const m = document.getElementById('modalHost'); if (m) m.remove(); },
+  toast(msg) { const h = document.getElementById('toastHost'); while (h.children.length >= 3) h.firstChild.remove(); const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; h.appendChild(t); setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 250); }, 2600); },
+  modal(html) { this.closeModal(); this._modalReturn = document.activeElement; const m = document.createElement('div'); m.className = 'modal-host'; m.id = 'modalHost'; m.innerHTML = `<div class="modal" role="dialog" aria-modal="true" tabindex="-1"><button class="btn sm ghost close" data-action="closeModal" aria-label="Close">✕</button>${html}</div>`; m.addEventListener('click', e => { if (e.target === m) this.closeModal(); }); document.body.appendChild(m); document.body.classList.add('modal-open'); m.querySelector('.modal').focus(); },
+  closeModal() { const m = document.getElementById('modalHost'); if (!m) return; m.remove(); document.body.classList.remove('modal-open'); if (this._modalReturn && document.body.contains(this._modalReturn)) this._modalReturn.focus(); },
   fmtTimer(s) { s = Math.max(0, Math.round(s)); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); },
 
   /* ---------- events ---------- */
@@ -110,6 +141,8 @@ const App = {
 /* ---------- click actions ---------- */
 const Actions = {
   closeModal() { App.closeModal(); },
+  goto(el) { App.closeModal(); location.hash = el.dataset.href; },
+  startTodaySession(el) { const s = getSessionTemplate(App.tier().id, el.dataset.sid); if (!s) return; App.ui.sessionDrills = s.drills.map(([id]) => ({ id, result: '' })); App.ui.sessionType = s.type; location.hash = '#/sessions'; App.toast(s.name + ': drills loaded. Log scores as you go.'); },
   openDrill(el) { const d = getDrill(el.dataset.id); if (d) App.modal(drillModal(d)); },
   toggleFav(el) { const f = App.state.favorites; const i = f.indexOf(el.dataset.id); i >= 0 ? f.splice(i, 1) : f.push(el.dataset.id); Store.save(); if (document.getElementById('modalHost')) Actions.openDrill(el); App.render(); },
   timerFor(el) { App.timerSet(parseInt(el.dataset.min, 10), el.dataset.name); App.closeModal(); location.hash = '#/tools'; App.timerToggle(); },
@@ -156,17 +189,20 @@ const Forms = {
     ['putts', 'firHit', 'firPossible', 'gir', 'penalties', 'udAtt', 'udMade', 'sandAtt', 'sandMade', 'threePutts', 'doubles'].forEach(k => { const n = parseFloat(v[k]); r[k] = isNaN(n) ? null : n; });
     if (r.firHit == null) r.firPossible = null;
     if (!(r.slope >= 55 && r.slope <= 155)) { App.toast('Slope must be between 55 and 155'); return; }
-    App.state.rounds.push(r); Store.save(); App.render();
+    const before = unlockedIds();
+    App.state.rounds.push(r); App.ui.roundCourse = null; Store.save(); App.render(); announceAchievements(before);
     const idx = App.index(); App.toast(idx != null ? 'Round saved. Index: ' + fmt1(idx) : 'Round saved (' + App.state.rounds.length + '/3 for an index)');
   },
   session(form, v) {
     Actions._captureResults();
     const s = { id: uid(), date: v.date, minutes: num(v.minutes, 0), type: v.type, notes: v.notes.trim(), drills: (App.ui.sessionDrills || []).map(d => ({ id: d.id, result: d.result })) };
-    App.state.sessions.push(s); App.ui.sessionDrills = []; Store.save(); App.render(); App.toast('Session saved. Nice work.');
+    const before = unlockedIds();
+    App.state.sessions.push(s); App.ui.sessionDrills = []; App.ui.sessionType = null; Store.save(); App.render(); App.toast('Session saved. Nice work.'); announceAchievements(before);
   },
   assessment(form, v) {
     const results = {}; ASSESSMENT_TESTS.forEach(t => { results[t.id] = Math.max(0, Math.min(10, num(v[t.id], 0))); });
-    App.state.assessments.push({ id: uid(), date: v.date, results }); Store.save(); App.render(); App.toast('Skills test saved');
+    const before = unlockedIds();
+    App.state.assessments.push({ id: uid(), date: v.date, results }); Store.save(); App.render(); App.toast('Skills test saved'); announceAchievements(before);
   },
   goals(form, v) {
     const p = App.state.profile; p.name = v.name.trim(); p.homeCourse = v.homeCourse.trim(); p.targetIndex = num(v.targetIndex, null); p.targetDate = v.targetDate; Store.save(); App.render(); App.toast('Goal saved');
@@ -214,6 +250,28 @@ function loadDemoData() {
   rows.forEach(([ago, score, putts, fir, gir, pen, tp, dbl, udA, udM], i) => s.rounds.push({ id: uid() + i, date: d(ago), course: i % 3 === 0 ? 'Riverside GC' : 'Home course', tees: 'White', par: 72, rating: 71.4, slope: 128, score, putts, firHit: fir, firPossible: 14, gir, penalties: pen, udAtt: udA, udMade: udM, sandAtt: 2, sandMade: i % 2, threePutts: tp, doubles: dbl, notes: i === 11 ? 'Best round of the year. Centre of green all day.' : '' }));
   [[2, 45, 'putting', [['ladder-lag', '15/20'], ['clock-drill', '4 ft']]], [4, 60, 'fullswing', [['towel-behind-ball', '17/20'], ['fairway-gate', '6/10']]], [6, 40, 'shortgame', [['towel-landing', '16/30'], ['up-and-down-10', '4/10']]], [9, 30, 'fitness', [['golf-strength-circuit', '']]], [11, 45, 'putting', [['3-6-9', '9 min']]], [13, 120, 'course', [['centre-of-green', '9 GIR']]], [16, 45, 'shortgame', [['dollar-bill', '8/10']]], [18, 60, 'fullswing', [['three-club-distance', '9/15']]], [20, 40, 'putting', [['par-18-putting', '21']]], [23, 35, 'fitness', [['med-ball-throws', '']]]]
     .forEach(([ago, minutes, type, drills], i) => s.sessions.push({ id: uid() + 's' + i, date: d(ago), minutes, type, notes: '', drills: drills.map(([id, result]) => ({ id, result })) }));
+  // The four most recent demo rounds get hole-by-hole cards so the scoring breakdown has data.
+  s.rounds.slice(-4).forEach((r, n) => {
+    const over = r.score - 72; const holes = DEFAULT_PARS.map(() => ({ strokes: 0, putts: 2, fir: null, pen: 0, sand: false }));
+    // spread strokes over par onto the hardest holes first, with a birdie or two on easy holes
+    const bySi = DEFAULT_SI.map((si, i) => [si, i]).sort((x, y) => x[0] - y[0]).map(x => x[1]);
+    // a realistic mix: a few doubles on the hardest holes, bogeys next, pars and a birdie or two on the easiest
+    const extra = Array(18).fill(0); let left = over + 2, k = 0;
+    const doubles = Math.min(3, Math.floor(over / 5)); for (; k < doubles; k++) { extra[bySi[k]] = 2; left -= 2; }
+    for (let j = 0; left > 0; j++) { extra[bySi[(k + j * 2 + n) % 18]]++; left--; }
+    extra[bySi[17 - n]]--; extra[bySi[15 - n]]--;
+    holes.forEach((h, i) => {
+      h.strokes = DEFAULT_PARS[i] + extra[i];
+      h.putts = extra[i] < 0 ? 1 : (i + n) % 7 === 0 ? 3 : (extra[i] === 0 && (i + n) % 3 === 0) || (i + n) % 4 === 0 ? 1 : 2;
+      if (h.putts >= h.strokes) h.putts = h.strokes - 1;
+      if (DEFAULT_PARS[i] >= 4) h.fir = ['hit', 'right', 'hit', 'left', 'right', 'hit'][(i + n) % 6];
+      h.pen = extra[i] >= 3 && i % 2 ? 1 : 0; h.sand = i === 6 || i === 13;
+    });
+    const st = statsFromHoles(holes, DEFAULT_PARS);
+    Object.assign(r, st, { holes, pars: DEFAULT_PARS.slice(), si: DEFAULT_SI.slice(), grossScore: st.gross, score: adjustedGross(holes, DEFAULT_PARS, DEFAULT_SI, 18) });
+    delete r.gross;
+  });
+  if (!s.courses.some(c => c.name === 'Home course')) s.courses.push({ id: uid() + 'c', name: 'Home course', tees: 'White', rating: 71.4, slope: 128, pars: DEFAULT_PARS.slice(), si: DEFAULT_SI.slice() });
   s.assessments.push({ id: uid() + 'a', date: d(42), results: { putt3: 8, putt6: 3, lag30: 4, chip15: 4, pitch40: 3, bunker: 3, wedge80: 3, iron7: 3, driver: 4 } });
   s.assessments.push({ id: uid() + 'b', date: d(3), results: { putt3: 9, putt6: 5, lag30: 6, chip15: 5, pitch40: 4, bunker: 4, wedge80: 4, iron7: 4, driver: 5 } });
   if (s.profile.targetIndex == null) { s.profile.targetIndex = 9.9; const t = new Date(today); t.setMonth(t.getMonth() + 9); s.profile.targetDate = t.toISOString().slice(0, 10); }

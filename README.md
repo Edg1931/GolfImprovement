@@ -1,11 +1,12 @@
 # Fairway Lab — Golf Improvement Hub
 
-A complete, self-contained website for lowering your handicap. No build step, no server, no accounts: open `index.html` in a browser or deploy it to Vercel. All data is stored in your browser (with JSON export/import for backups).
+A complete, self-contained golf app for lowering your handicap. You can install it on your phone's home screen, and it works offline on the course. No build step, no server, no accounts: open `index.html` in a browser or deploy it to Vercel. All data is stored in your browser (with JSON export/import for backups).
 
 ## What's inside
 
 | Page | What it does |
 | --- | --- |
+| **Play a round** | Live hole-by-hole scorecard with net and Stableford scoring, the WHS net-double-bogey cap, a course library and GPS shot distance |
 | **Dashboard** | Handicap Index, trend chart, progress to target, this week's sessions, top three stroke-loss areas, 12-week program status |
 | **Rounds & Handicap** | Log rounds with stats. Calculates score differentials and your Handicap Index using the World Handicap System (best 8 of last 20, with the official table for fewer rounds) |
 | **Stats & Stroke Loss** | Compares your averages (putts, GIR, fairways, scrambling, penalties, doubles) to benchmark data for your target handicap and ranks where you lose strokes, with drills for each |
@@ -38,6 +39,9 @@ A complete, self-contained website for lowering your handicap. No build step, no
   js/charts.js        dependency-free canvas charts (line, bar, radar)
   js/views.js         page renderers
   js/app.js           router, actions, forms, timer, demo data
+  js/scorecard.js     live scorecard, course library, GPS measure, achievements
+  sw.js               offline cache (service worker)
+  manifest.webmanifest, icons/   installable-app metadata
 ```
 
 Plain scripts (no modules or bundler) so the site works from a `file://` URL as well as a web server.
@@ -46,3 +50,5 @@ Plain scripts (no modules or bundler) so the site works from a `file://` URL as 
 
 - Handicap maths follows the WHS: differential = (113 ÷ slope) × (adjusted gross − course rating); index from the standard table (1 best −2 with 3 rounds … best 8 of 20). Course handicap = index × (slope ÷ 113) + (rating − par).
 - Benchmarks by handicap are approximate averages drawn from published shot-tracking data. The stroke-loss figures are estimates meant for ranking your focus areas, not a strokes-gained calculation.
+
+See [ROADMAP.md](ROADMAP.md) for a competitor comparison and the recommended next features.

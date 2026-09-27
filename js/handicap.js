@@ -136,3 +136,77 @@ function stablefordPoints(gross, par, strokesReceived) {
   const diff = net - par;
   return Math.max(0, 2 - diff);
 }
+
+/* ---------- Hole-by-hole scoring ---------- */
+
+/* Handicap strokes received on a hole, given course handicap and the hole's stroke index (1 = hardest). */
+function strokesOnHole(ch, si) {
+  if (ch == null || isNaN(ch) || !si) return 0;
+  if (ch >= 0) return Math.floor(ch / 18) + (si <= ch % 18 ? 1 : 0);
+  const plus = -ch; return -(Math.floor(plus / 18) + (si > 18 - (plus % 18) ? 1 : 0));
+}
+
+/* WHS adjusted gross score: each hole capped at net double bogey (par + 2 + strokes received).
+   Golfers without an index are capped at par + 5. */
+function adjustedGross(holes, pars, si, ch) {
+  return holes.reduce((sum, h, i) => {
+    if (h.strokes == null) return sum;
+    const cap = ch == null ? pars[i] + 5 : pars[i] + 2 + strokesOnHole(ch, si[i]);
+    return sum + Math.min(h.strokes, cap);
+  }, 0);
+}
+
+/* Derive the round-level stats the rest of the app uses from hole-by-hole entries. */
+function statsFromHoles(holes, pars) {
+  const played = holes.map((h, i) => ({ ...h, par: pars[i] })).filter(h => h.strokes != null);
+  const s = { gross: 0, putts: 0, firHit: 0, firPossible: 0, gir: 0, penalties: 0, udAtt: 0, udMade: 0, sandAtt: 0, sandMade: 0, threePutts: 0, doubles: 0 };
+  let puttsKnown = false;
+  played.forEach(h => {
+    s.gross += h.strokes; s.penalties += h.pen || 0;
+    if (h.strokes >= h.par + 2) s.doubles++;
+    if (h.par >= 4 && h.fir) { s.firPossible++; if (h.fir === 'hit') s.firHit++; }
+    if (h.putts != null) {
+      puttsKnown = true; s.putts += h.putts; if (h.putts >= 3) s.threePutts++;
+      const gir = h.strokes - h.putts <= h.par - 2;
+      if (gir) s.gir++; else { s.udAtt++; if (h.strokes <= h.par) s.udMade++; }
+    }
+    if (h.sand) { s.sandAtt++; if (h.strokes <= h.par) s.sandMade++; }
+  });
+  if (!puttsKnown) ['putts', 'gir', 'udAtt', 'udMade', 'threePutts'].forEach(k => { s[k] = null; });
+  if (!s.firPossible) { s.firHit = null; s.firPossible = null; }
+  return s;
+}
+
+const SCORE_NAMES = [[-3, 'Albatross'], [-2, 'Eagle'], [-1, 'Birdie'], [0, 'Par'], [1, 'Bogey'], [2, 'Double'], [3, 'Triple+']];
+function scoreName(strokes, par) { const d = Math.max(-3, Math.min(3, strokes - par)); return SCORE_NAMES.find(n => n[0] === d)[1]; }
+
+/* Scoring breakdown across rounds that have hole data (newest first). */
+function holeBreakdown(rounds) {
+  const withHoles = rounds.filter(r => Array.isArray(r.holes) && r.pars);
+  if (!withHoles.length) return null;
+  const dist = { eagle: 0, birdie: 0, par: 0, bogey: 0, double: 0, triple: 0 };
+  const byPar = { 3: [], 4: [], 5: [] }; const front = [], back = [];
+  const miss = { hit: 0, left: 0, right: 0 };
+  let holesN = 0;
+  withHoles.forEach(r => {
+    let f = 0, b = 0, full = true;
+    r.holes.forEach((h, i) => {
+      if (h.strokes == null) { full = false; return; }
+      const par = r.pars[i], d = h.strokes - par; holesN++;
+      if (d <= -2) dist.eagle++; else if (d === -1) dist.birdie++; else if (d === 0) dist.par++; else if (d === 1) dist.bogey++; else if (d === 2) dist.double++; else dist.triple++;
+      if (byPar[par]) byPar[par].push(d);
+      if (i < 9) f += d; else b += d;
+      if (par >= 4 && h.fir && miss[h.fir] != null) miss[h.fir]++;
+    });
+    if (full && r.holes.length === 18) { front.push(f); back.push(b); }
+  });
+  return { rounds: withHoles.length, holes: holesN, dist, par3: avg(byPar[3]), par4: avg(byPar[4]), par5: avg(byPar[5]), front: avg(front), back: avg(back), miss };
+}
+
+/* Great-circle distance in yards between two {lat, lon} points. */
+function yardsBetween(a, b) {
+  const R = 6371000, rad = x => x * Math.PI / 180;
+  const dLat = rad(b.lat - a.lat), dLon = rad(b.lon - a.lon);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h)) * 1.09361;
+}

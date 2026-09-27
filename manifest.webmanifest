@@ -1,0 +1,22 @@
+{
+  "name": "Fairway Lab — Golf Improvement Hub",
+  "short_name": "Fairway Lab",
+  "description": "Handicap tracking, a live scorecard, stroke-loss analysis and a 54-drill practice system.",
+  "start_url": "./#/dashboard",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f1e8",
+  "theme_color": "#12352a",
+  "categories": ["sports", "health", "lifestyle"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ],
+  "shortcuts": [
+    { "name": "Play a round", "url": "./#/play", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Log practice", "url": "./#/sessions", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

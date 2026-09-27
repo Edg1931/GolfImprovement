@@ -16,7 +16,9 @@ const Store = {
       planChecks: {},    // {"2026-W12": {"Mon": true}}
       programStart: '',  // ISO date
       commitments: {},   // {key: true}
-      settings: { theme: 'light' },
+      courses: [],       // {id, name, tees, rating, slope, pars:[18], si:[18]}
+      liveRound: null,   // in-progress hole-by-hole round (see scorecard.js)
+      settings: { theme: '' },  // '' follows the system setting
     };
   },
   load() {
@@ -26,6 +28,7 @@ const Store = {
     this.state = Object.assign(d, s || {});
     this.state.profile = Object.assign(d.profile, (s && s.profile) || {});
     this.state.settings = Object.assign(d.settings, (s && s.settings) || {});
+    if (!Array.isArray(this.state.courses)) this.state.courses = [];
     if (!this.state.clubs) this.state.clubs = DEFAULT_CLUBS.map(c => ({ ...c }));
     if (!this.state.routine) this.state.routine = DEFAULT_ROUTINE.slice();
     return this.state;
