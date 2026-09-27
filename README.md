@@ -6,7 +6,7 @@ A complete, self-contained golf app for lowering your handicap. You can install 
 
 | Page | What it does |
 | --- | --- |
-| **Play a round** | Live hole-by-hole scorecard with net and Stableford scoring, the WHS net-double-bogey cap, a course library and GPS shot distance |
+| **Play a round** | Search any course and its rating, slope, par, stroke index and yardages fill in. Choose 18 holes, front 9 or back 9, then score hole by hole with net and Stableford totals, the WHS net-double-bogey cap and GPS shot distance. Nine-hole rounds count toward your index under the 2024 WHS expected-score rule. |
 | **Dashboard** | Handicap Index, trend chart, progress to target, this week's sessions, top three stroke-loss areas, 12-week program status |
 | **Rounds & Handicap** | Log rounds with stats. Calculates score differentials and your Handicap Index using the World Handicap System (best 8 of last 20, with the official table for fewer rounds) |
 | **Stats & Stroke Loss** | Compares your averages (putts, GIR, fairways, scrambling, penalties, doubles) to benchmark data for your target handicap and ranks where you lose strokes, with drills for each |
@@ -25,6 +25,16 @@ A complete, self-contained golf app for lowering your handicap. You can install 
 - **Vercel:** import this repository in Vercel with Framework Preset **Other**, no build command, and the output directory left as the repo root. Vercel serves `index.html` as a static site.
 - **Try it with data:** go to *Tools → Load demo data* to see every page populated.
 
+## Course search setup
+
+Course search uses [GolfCourseAPI](https://golfcourseapi.com) (free tier) through the serverless function in `api/courses.js`, so the key never reaches the browser.
+
+1. Sign up at golfcourseapi.com and copy your API key.
+2. In Vercel, open the project, go to **Settings → Environment Variables**, and add `GOLF_COURSE_API_KEY` for Production and Preview.
+3. Redeploy.
+
+Without a key, the app still works: courses can be entered by hand and saved to the library.
+
 ## Structure
 
 ```
@@ -40,6 +50,7 @@ A complete, self-contained golf app for lowering your handicap. You can install 
   js/views.js         page renderers
   js/app.js           router, actions, forms, timer, demo data
   js/scorecard.js     live scorecard, course library, GPS measure, achievements
+  api/courses.js      Vercel serverless course-search proxy
   sw.js               offline cache (service worker)
   manifest.webmanifest, icons/   installable-app metadata
 ```

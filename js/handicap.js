@@ -23,7 +23,7 @@ function whsRule(n) {
 
 /* rounds sorted newest first; uses up to the latest 20 */
 function computeIndex(rounds) {
-  const diffs = rounds.slice(0, 20).map(r => r.diff).filter(d => d != null);
+  const diffs = rounds.map(r => r.diff).filter(d => d != null).slice(0, 20);
   const rule = whsRule(diffs.length);
   if (!rule) return null;
   const best = diffs.slice().sort((a, b) => a - b).slice(0, rule.use);
@@ -51,7 +51,7 @@ function courseHandicap(index, slope, rating, par) {
 
 /* Aggregate stats over the last N rounds (newest first). */
 function roundStats(rounds, n) {
-  const rs = rounds.slice(0, n);
+  const rs = rounds.filter(r => r.holesPlayed !== 9).slice(0, n);
   if (!rs.length) return null;
   const s = {
     n: rs.length,
@@ -139,11 +139,33 @@ function stablefordPoints(gross, par, strokesReceived) {
 
 /* ---------- Hole-by-hole scoring ---------- */
 
-/* Handicap strokes received on a hole, given course handicap and the hole's stroke index (1 = hardest). */
-function strokesOnHole(ch, si) {
+/* Handicap strokes received on a hole, given course handicap and the hole's stroke index (1 = hardest).
+   n is the number of holes the stroke index runs over (18, or 9 for a nine-hole round). */
+function strokesOnHole(ch, si, n) {
+  n = n || 18;
   if (ch == null || isNaN(ch) || !si) return 0;
-  if (ch >= 0) return Math.floor(ch / 18) + (si <= ch % 18 ? 1 : 0);
-  const plus = -ch; return -(Math.floor(plus / 18) + (si > 18 - (plus % 18) ? 1 : 0));
+  if (ch >= 0) return Math.floor(ch / n) + (si <= ch % n ? 1 : 0);
+  const plus = -ch; return -(Math.floor(plus / n) + (si > n - (plus % n) ? 1 : 0));
+}
+
+/* Re-rank a subset of 18-hole stroke indexes to 1..n (used when playing nine holes). */
+function rankStrokeIndex(si) {
+  const order = si.map((v, i) => [v, i]).sort((a, b) => a[0] - b[0]);
+  const out = Array(si.length); order.forEach(([, i], rank) => { out[i] = rank + 1; }); return out;
+}
+
+/* Nine-hole course handicap: half the index, scaled by the nine's slope, plus rating minus par for that nine. */
+function courseHandicap9(index, slope9, rating9, par9) {
+  if (index == null || isNaN(index)) return null;
+  return Math.round((index / 2) * (slope9 / 113) + (rating9 - par9));
+}
+
+/* WHS (2024): a nine-hole score becomes an 18-hole differential by adding the player's expected
+   nine-hole differential, (Index × 0.52) + 1.2. Needs an index; returns null otherwise. */
+function nineHoleDifferential(score9, rating9, slope9, index) {
+  if (index == null || isNaN(index) || [score9, rating9, slope9].some(v => v == null || isNaN(v)) || !slope9) return null;
+  const d9 = (113 / slope9) * (score9 - rating9);
+  return Math.round((d9 + index * 0.52 + 1.2) * 10) / 10;
 }
 
 /* WHS adjusted gross score: each hole capped at net double bogey (par + 2 + strokes received).
@@ -151,7 +173,7 @@ function strokesOnHole(ch, si) {
 function adjustedGross(holes, pars, si, ch) {
   return holes.reduce((sum, h, i) => {
     if (h.strokes == null) return sum;
-    const cap = ch == null ? pars[i] + 5 : pars[i] + 2 + strokesOnHole(ch, si[i]);
+    const cap = ch == null ? pars[i] + 5 : pars[i] + 2 + strokesOnHole(ch, si[i], holes.length);
     return sum + Math.min(h.strokes, cap);
   }, 0);
 }

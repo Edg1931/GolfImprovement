@@ -29,11 +29,14 @@ const App = {
 
   /* ---------- derived data ---------- */
   rounds() {
-    return this.state.rounds.map(r => ({ ...r, diff: scoreDifferential(r.score, r.rating, r.slope) })).sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+    return this.state.rounds.map(r => ({ ...r, diff: r.holesPlayed === 9 ? (r.diff18 != null ? r.diff18 : null) : scoreDifferential(r.score, r.rating, r.slope) }))
+      .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
   },
+  /* 18-hole rounds only, for per-round averages and score charts. */
+  fullRounds() { return this.rounds().filter(r => r.holesPlayed !== 9); },
   index() { return computeIndex(this.rounds()); },
   countedDiffs() {
-    const rs = this.rounds().slice(0, 20); const rule = whsRule(rs.length); if (!rule) return [];
+    const rs = this.rounds().filter(r => r.diff != null).slice(0, 20); const rule = whsRule(rs.length); if (!rule) return [];
     return rs.slice().sort((a, b) => a.diff - b.diff).slice(0, rule.use).map(r => r.id);
   },
   tier() { const o = this.state.profile.tierOverride; return (o && TIERS.find(t => t.id === o)) || tierForIndex(this.index()); },
@@ -186,6 +189,12 @@ const Actions = {
 const Forms = {
   round(form, v) {
     const r = { id: uid(), date: v.date, course: v.course.trim(), tees: v.tees.trim(), par: num(v.par, 72), rating: num(v.rating), slope: num(v.slope), score: num(v.score), notes: v.notes.trim() };
+    if (v.holesPlayed === '9') {
+      // Nine holes: the card's 18-hole rating is halved (slope stays the same) and par is for the nine played.
+      const idx = App.index(); r.holesPlayed = 9; r.rating = Math.round(r.rating / 2 * 10) / 10;
+      r.diff18 = nineHoleDifferential(r.score, r.rating, r.slope, idx);
+      if (r.diff18 == null) App.toast('Nine-hole rounds count toward your index once you have one (3 full rounds).');
+    }
     ['putts', 'firHit', 'firPossible', 'gir', 'penalties', 'udAtt', 'udMade', 'sandAtt', 'sandMade', 'threePutts', 'doubles'].forEach(k => { const n = parseFloat(v[k]); r[k] = isNaN(n) ? null : n; });
     if (r.firHit == null) r.firPossible = null;
     if (!(r.slope >= 55 && r.slope <= 155)) { App.toast('Slope must be between 55 and 155'); return; }

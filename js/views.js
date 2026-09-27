@@ -13,6 +13,8 @@ function drillCard(d, compact) {
     <div class="drill-meta"><span>⏱ ${d.minutes} min</span><span>Difficulty ${dots(d.difficulty)}</span></div>
   </div>`;
 }
+function lowDiff(rounds) { const d = rounds.map(r => r.diff).filter(x => x != null).slice(0, 20); return d.length ? fmt1(Math.min(...d)) : '—'; }
+function holesLabel(r) { return r.holesPlayed === 9 ? ` <span class="badge neutral" title="Nine-hole round">${r.nine === 'back' ? 'B9' : r.nine === 'front' ? 'F9' : '9'}</span>` : ''; }
 function drillLink(id) { const d = getDrill(id); return d ? `<a href="#" data-action="openDrill" data-id="${d.id}">${escapeHtml(d.name)}</a>` : escapeHtml(id); }
 function statBox(label, value, sub, cls) { return `<div class="stat ${cls || ''}"><span class="label">${label}</span><span class="value">${value}</span>${sub ? `<span class="sub">${sub}</span>` : ''}</div>`; }
 function onboarding() {
@@ -54,10 +56,10 @@ Views.dashboard = function () {
     <div class="card accent"><div class="stat-row">
       ${statBox('Handicap Index', idx != null ? fmt1(idx) : '—', idx == null ? `${rounds.length}/3 rounds needed` : (trend != null ? (trend <= 0 ? '▼ ' : '▲ ') + fmt1(Math.abs(trend)) + ' vs 5 rounds ago' : 'Based on ' + Math.min(rounds.length, 20) + ' rounds'))}
       ${statBox('Target', p.targetIndex != null ? fmt1(p.targetIndex) : '—', p.targetDate ? 'by ' + fmtDate(p.targetDate) : '<a href="#/goals">Set a goal</a>')}
-      ${statBox('Avg score (last 5)', st5 ? Math.round(st5.score) : '—', st5 ? 'best ' + Math.min(...rounds.slice(0, 5).map(r => r.score)) : '')}
+      ${statBox('Avg score (last 5)', st5 ? Math.round(st5.score) : '—', st5 ? 'best ' + Math.min(...App.fullRounds().slice(0, 5).map(r => r.grossScore ?? r.score)) : '')}
     </div>
     ${(idx != null && p.targetIndex != null) ? App.goalProgressBar(idx) : ''}
-    ${rounds.length ? `<div class="kv mt small"><dt>Rounds counting</dt><dd>${App.countedDiffs().length} best of last ${Math.min(rounds.length, 20)}</dd><dt>Low differential</dt><dd>${fmt1(Math.min(...rounds.slice(0, 20).map(r => r.diff)))}</dd><dt>Level</dt><dd>${tier.label} (${tier.range})</dd>${prog ? `<dt>Program</dt><dd>Week ${prog.week} of 12</dd>` : ''}</div>` : ''}
+    ${rounds.length ? `<div class="kv mt small"><dt>Rounds counting</dt><dd>${App.countedDiffs().length} best of last ${Math.min(rounds.length, 20)}</dd><dt>Low differential</dt><dd>${lowDiff(rounds)}</dd><dt>Level</dt><dd>${tier.label} (${tier.range})</dd>${prog ? `<dt>Program</dt><dd>Week ${prog.week} of 12</dd>` : ''}</div>` : ''}
     </div>
     <div class="card"><div class="card-head"><h3>Index trend</h3><a class="small" href="#/rounds">All rounds</a></div><canvas class="chart" id="dashIndexChart"></canvas></div>
   </div>`;
@@ -95,7 +97,7 @@ Views.dashboard = function () {
       ${prog ? `<p><strong>Week ${prog.week} of 12</strong> · ${escapeHtml(prog.phase.name)}</p><div class="phase-bar">${[...Array(12)].map((_, i) => `<span class="${i < 4 ? 'p1' : i < 8 ? 'p2' : 'p3'} ${i + 1 === prog.week ? 'current' : ''}"></span>`).join('')}</div><p class="small muted mb0">This week: ${escapeHtml(PROGRAM.weekThemes[prog.week])}</p>` : `<p class="muted">Not started. The program structures 12 weeks into Foundation, Build and Perform phases.</p><button class="btn primary sm" data-action="startProgram">Start the 12-week program</button>`}
     </div>
     <div class="card"><div class="card-head"><h3>Recent rounds</h3><a class="small" href="#/rounds">All</a></div>
-      ${rounds.length ? `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Course</th><th class="num">Score</th><th class="num">Diff</th><th class="num">Putts</th></tr></thead><tbody>${rounds.slice(0, 5).map(r => `<tr><td>${fmtDate(r.date)}</td><td>${escapeHtml(r.course || '—')}</td><td class="num">${r.grossScore ?? r.score}</td><td class="num">${fmt1(r.diff)}</td><td class="num">${r.putts != null ? r.putts : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">No rounds yet.</div>'}
+      ${rounds.length ? `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Course</th><th class="num">Score</th><th class="num">Diff</th><th class="num">Putts</th></tr></thead><tbody>${rounds.slice(0, 5).map(r => `<tr><td>${fmtDate(r.date)}</td><td>${escapeHtml(r.course || '—')}${holesLabel(r)}</td><td class="num">${r.grossScore ?? r.score}</td><td class="num">${fmt1(r.diff)}</td><td class="num">${r.putts != null ? r.putts : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">No rounds yet.</div>'}
     </div>
   </div>`;
 
@@ -116,8 +118,8 @@ Views.rounds = function () {
   let html = `<div class="page-head"><div><h1>Rounds &amp; Handicap</h1><p class="muted">Log every round with stats. Your Handicap Index follows the World Handicap System (best 8 of your last 20 differentials).</p></div></div>`;
   html += `<div class="grid grid-3">
     <div class="card accent">${statBox('Handicap Index', idx != null ? fmt1(idx) : '—', idx == null ? `${rounds.length}/3 rounds needed` : 'best ' + whsRule(Math.min(rounds.length, 20)).use + ' of last ' + Math.min(rounds.length, 20))}</div>
-    <div class="card">${statBox('Low differential', rounds.length ? fmt1(Math.min(...rounds.slice(0, 20).map(r => r.diff))) : '—', 'last 20 rounds')}</div>
-    <div class="card">${statBox('Avg score', rounds.length ? fmt1(avg(rounds.slice(0, 20).map(r => r.score))) : '—', 'last 20 rounds')}</div>
+    <div class="card">${statBox('Low differential', lowDiff(rounds), 'last 20 scores')}</div>
+    <div class="card">${statBox('Avg score', App.fullRounds().length ? fmt1(avg(App.fullRounds().slice(0, 20).map(r => r.grossScore ?? r.score))) : '—', 'last 20 full rounds')}</div>
   </div>`;
 
   html += `<div class="grid grid-2 mt"><div class="card"><div class="card-head"><h2>Log a round</h2><a class="btn sm" href="#/play">⛳ Score hole by hole</a></div>
@@ -129,10 +131,11 @@ Views.rounds = function () {
       <div class="field"><label>Tees</label><input name="tees" value="${escapeHtml(last.tees || '')}" placeholder="White"></div>
     </div>
     <div class="form-row">
-      <div class="field"><label>Par</label><input type="number" name="par" value="${last.par || 72}" min="60" max="80" required></div>
+      <div class="field"><label>Holes</label><select name="holesPlayed"><option value="18">18 holes</option><option value="9">9 holes</option></select></div>
+      <div class="field"><label>Par (holes played)</label><input type="number" name="par" value="${last.par || 72}" min="27" max="80" required></div>
       <div class="field"><label>Course rating</label><input type="number" step="0.1" name="rating" value="${last.rating || ''}" placeholder="71.2" required><span class="hint">On the scorecard</span></div>
       <div class="field"><label>Slope</label><input type="number" name="slope" value="${last.slope || ''}" placeholder="128" min="55" max="155" required></div>
-      <div class="field"><label>Score (adjusted gross)</label><input type="number" name="score" placeholder="88" min="50" max="150" required><span class="hint">Cap any hole at net double bogey</span></div>
+      <div class="field"><label>Score (adjusted gross)</label><input type="number" name="score" placeholder="88" min="25" max="150" required><span class="hint">Cap any hole at net double bogey. For 9 holes, enter the card's 18-hole rating and slope.</span></div>
     </div>
     <fieldset><legend>Stats (optional but powerful)</legend>
     <div class="form-row">
@@ -158,14 +161,14 @@ Views.rounds = function () {
 
   html += `<div class="card mt"><div class="card-head"><h2>Round history</h2><span class="muted small">${rounds.length} rounds</span></div>
     ${rounds.length ? `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Course</th><th class="num">Score</th><th class="num">Rating/Slope</th><th class="num">Diff</th><th class="num">Putts</th><th class="num">FIR</th><th class="num">GIR</th><th class="num">Pen</th><th class="num">U&amp;D</th><th></th></tr></thead><tbody>
-    ${rounds.map((r, i) => `<tr class="${i < 20 && App.countedDiffs().includes(r.id) ? 'highlight' : ''}"><td class="nowrap">${fmtDate(r.date)}</td><td>${escapeHtml(r.course || '—')}${r.notes ? `<div class="tiny muted">${escapeHtml(r.notes)}</div>` : ''}</td><td class="num"><strong>${r.grossScore ?? r.score}</strong>${r.grossScore != null && r.grossScore !== r.score ? `<div class="tiny muted" title="Adjusted gross score used for handicap">adj ${r.score}</div>` : ''}</td><td class="num">${r.rating}/${r.slope}</td><td class="num">${fmt1(r.diff)}</td><td class="num">${r.putts ?? '—'}</td><td class="num">${r.firHit != null ? r.firHit + '/' + r.firPossible : '—'}</td><td class="num">${r.gir ?? '—'}</td><td class="num">${r.penalties ?? '—'}</td><td class="num">${r.udAtt ? r.udMade + '/' + r.udAtt : '—'}</td><td class="nowrap">${r.holes ? `<button class="btn sm" data-action="viewCard" data-id="${r.id}">Card</button>` : ''}<button class="btn sm ghost danger" data-action="deleteRound" data-id="${r.id}" title="Delete" aria-label="Delete round">✕</button></td></tr>`).join('')}
+    ${rounds.map((r, i) => `<tr class="${i < 20 && App.countedDiffs().includes(r.id) ? 'highlight' : ''}"><td class="nowrap">${fmtDate(r.date)}</td><td>${escapeHtml(r.course || '—')}${holesLabel(r)}${r.notes ? `<div class="tiny muted">${escapeHtml(r.notes)}</div>` : ''}</td><td class="num"><strong>${r.grossScore ?? r.score}</strong>${r.grossScore != null && r.grossScore !== r.score ? `<div class="tiny muted" title="Adjusted gross score used for handicap">adj ${r.score}</div>` : ''}</td><td class="num">${r.rating}/${r.slope}</td><td class="num" ${r.holesPlayed === 9 ? 'title="18-hole equivalent (WHS nine-hole rule)"' : ''}>${fmt1(r.diff)}</td><td class="num">${r.putts ?? '—'}</td><td class="num">${r.firHit != null ? r.firHit + '/' + r.firPossible : '—'}</td><td class="num">${r.gir ?? '—'}</td><td class="num">${r.penalties ?? '—'}</td><td class="num">${r.udAtt ? r.udMade + '/' + r.udAtt : '—'}</td><td class="nowrap">${r.holes ? `<button class="btn sm" data-action="viewCard" data-id="${r.id}">Card</button>` : ''}<button class="btn sm ghost danger" data-action="deleteRound" data-id="${r.id}" title="Delete" aria-label="Delete round">✕</button></td></tr>`).join('')}
     </tbody></table></div><p class="tiny muted mt mb0">Highlighted rows are the differentials currently counting toward your index.</p>` : '<div class="empty">No rounds logged yet. Add your first round above.</div>'}
   </div>`;
 
   App.after(() => {
     const c = document.getElementById('roundsChart'); if (!c) return;
     const asc = hist.slice(-20);
-    Charts.line(c, asc.map(h => fmtDate(h.date)), [{ label: 'Score', values: asc.map(h => h.score), color: 'blue' }, { label: 'Differential', values: asc.map((h, i) => rounds.slice().reverse().slice(-20)[i].diff), color: 'accent' }], { emptyMsg: 'Log rounds to see the chart' });
+    Charts.line(c, asc.map(h => fmtDate(h.date)), [{ label: 'Score (18 holes)', values: asc.map((h, i) => { const r = rounds.slice().reverse().slice(-20)[i]; return r.holesPlayed === 9 ? null : h.score; }), color: 'blue' }, { label: 'Differential', values: asc.map((h, i) => rounds.slice().reverse().slice(-20)[i].diff), color: 'accent' }], { emptyMsg: 'Log rounds to see the chart' });
   });
   return html;
 };
@@ -231,7 +234,7 @@ Views.stats = function () {
 
   App.after(() => {
     const lc = document.getElementById('lossChart'); if (lc) Charts.bar(lc, analysis.map(a => ({ label: a.label.split(' ')[0], value: Math.max(0, a.loss), color: a.loss > 2 ? 'red' : a.loss > 0.8 ? 'gold' : 'accent' })), { emptyMsg: 'Add stats to rounds' });
-    const asc = rounds.slice(0, n).reverse(); const labels = asc.map(r => fmtDate(r.date));
+    const asc = App.fullRounds().slice(0, n).reverse(); const labels = asc.map(r => fmtDate(r.date));
     const pc = document.getElementById('puttsChart'); if (pc) Charts.line(pc, labels, [{ label: 'Putts', values: asc.map(r => r.putts ?? null) }], { target: b.putts, emptyMsg: 'Log putts per round' });
     const gc = document.getElementById('girChart'); if (gc) Charts.line(gc, labels, [{ label: 'GIR', values: asc.map(r => r.gir ?? null), color: 'accent' }, { label: 'FIR', values: asc.map(r => r.firHit ?? null), color: 'blue' }], { emptyMsg: 'Log greens and fairways' });
   });

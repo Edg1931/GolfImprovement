@@ -510,7 +510,30 @@ table.scorecard thead th:last-child { border-radius: 0 8px 0 0; background: var(
 .miss-bar .h { background: var(--green-500); color: #fff; }
 .miss-bar .r { background: color-mix(in srgb, var(--blue) 30%, var(--surface)); }
 
+/* ---------- Course search ---------- */
+.search-row { display: flex; gap: 8px; }
+.search-row input { flex: 1; min-width: 0; font: inherit; padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); min-height: 44px; }
+.search-row input:focus { outline: none; box-shadow: 0 0 0 3px var(--ring); border-color: var(--accent); }
+.spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border-strong); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -2px; margin-right: 6px; }
+.course-results { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 8px; }
+.course-results > li { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--surface); transition: border-color .15s, box-shadow .2s; }
+.course-results > li.open { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); box-shadow: var(--shadow); }
+.course-hit { width: 100%; display: flex; align-items: center; gap: 12px; justify-content: space-between; text-align: left; padding: 12px 14px; background: none; border: 0; font: inherit; color: var(--text); cursor: pointer; }
+.course-hit:hover { background: var(--surface-2); }
+.chev { width: 8px; height: 8px; border-right: 2px solid var(--text-muted); border-bottom: 2px solid var(--text-muted); transform: rotate(45deg); transition: transform .2s; flex-shrink: 0; margin-right: 4px; }
+.open .chev { transform: rotate(-135deg); }
+.tee-list { display: grid; gap: 6px; padding: 4px 10px 12px; }
+.tee-opt { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); font: inherit; color: var(--text); text-align: left; cursor: pointer; transition: border-color .15s, transform .1s; }
+.tee-opt > span:nth-child(2) { flex: 1; }
+.tee-opt:hover { border-color: var(--accent); }
+.tee-opt:active { transform: scale(.99); }
+.tee-swatch { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0, 0, 0, .2); flex-shrink: 0; vertical-align: -2px; }
+.tee-swatch.lg { width: 22px; height: 22px; }
+.course-summary { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 12px; background: var(--green-100); border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent); }
+code { font-family: var(--mono); font-size: .85em; background: var(--surface-2); border: 1px solid var(--border); padding: 1px 5px; border-radius: 5px; }
+
 /* ---------- Motion ---------- */
+@keyframes spin { to { transform: rotate(360deg); } }
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes pop { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }

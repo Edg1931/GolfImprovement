@@ -24,6 +24,8 @@ This review compares Fairway Lab with the leading golf apps: Arccos, Shot Scope,
 | **Achievements** (15 badges) | 18Birdies, Hole19 | Computed from your data, e.g. Broke 90, Ice Cold (no three-putts) and Habit Formed. They announce themselves as you unlock them. |
 | **"Today" card** | Clippd, V1 | Today's scheduled session with a one-tap start that loads the drills into the practice log. |
 | **Installable app, works offline** | Native apps | Home-screen icon, full-screen mode, works with no signal on the course, and keeps the screen on during a round. |
+| **Course search and auto-fill** | 18Birdies, Golfshot, TheGrint | Search GolfCourseAPI, pick a tee, and rating, slope, par, stroke index, yardages and front/back-nine ratings fill in automatically. |
+| **9 or 18 holes** | TheGrint, the official handicap apps | Front or back nine, or 9-hole courses. Nine-hole scores become 18-hole differentials using the 2024 WHS expected-score rule. |
 | **Visual redesign** | — | Serif display type, a clubhouse colour palette, SVG icons, a bottom tab bar on phones with a raised Play button, bottom-sheet dialogs, motion that respects reduced-motion settings, and automatic dark mode. |
 
 It also fixes bugs from the first version. Every tap re-rendered the page and jumped back to the top. On phones, wide tables overflowed the layout. Charts now redraw once the web font has loaded.
@@ -31,12 +33,10 @@ It also fixes bugs from the first version. Every tap re-rendered the page and ju
 ## Recommended next features (by impact)
 
 1. **Accounts and cloud sync** (Supabase). Rounds survive a lost phone and sync between phone and laptop. This is the biggest gap against every competitor.
-2. **Course search** from a public course database, auto-filling rating, slope, par and stroke index (GolfCourseAPI or similar) so nobody types a scorecard.
-3. **Green front/centre/back yardages** on a satellite map (Hole19, 18Birdies). This needs course geometry: use OpenStreetMap golf features where they exist, or let players drop pins once per course.
-4. **Shot-level tracking**: club and distance per shot, turning the GPS measure into a real shot map and true strokes-gained (Arccos, Shot Scope).
-5. **9-hole rounds for the handicap** using the 2024 WHS expected-score rule.
-6. **AI caddie / coach summary** after each round: a plain-English "what cost you strokes today and what to practise this week" (18Birdies AI caddie, Clippd insights).
-7. **Friends and leaderboards**: share a round card image, weekly practice-minutes leaderboard (18Birdies, Garmin).
-8. **Apple Watch / Wear OS companion** for the scorecard (Hole19, Garmin).
-9. **Swing video capture** with a side-by-side and a drawing tool (V1 Golf). This is heavier and best linked out to at first.
-10. **Reminders**: push notifications for scheduled practice sessions (these need the installable app plus a push service).
+2. **Green front/centre/back yardages** on a satellite map (Hole19, 18Birdies). This needs course geometry: use OpenStreetMap golf features where they exist, or let players drop pins once per course.
+3. **Shot-level tracking**: club and distance per shot, turning the GPS measure into a real shot map and true strokes-gained (Arccos, Shot Scope).
+4. **AI caddie / coach summary** after each round: a plain-English "what cost you strokes today and what to practise this week" (18Birdies AI caddie, Clippd insights).
+5. **Friends and leaderboards**: share a round card image, weekly practice-minutes leaderboard (18Birdies, Garmin).
+6. **Apple Watch / Wear OS companion** for the scorecard (Hole19, Garmin).
+7. **Swing video capture** with a side-by-side and a drawing tool (V1 Golf). This is heavier and best linked out to at first.
+8. **Reminders**: push notifications for scheduled practice sessions (these need the installable app plus a push service).
