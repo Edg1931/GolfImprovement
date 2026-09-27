@@ -229,6 +229,31 @@ function scorecardTable(holes, pars, si, first) {
   return `<div class="table-wrap">${nine(0)}${holes.length > 9 ? nine(9) : ''}</div><p class="tiny muted mb0 sc-legend"><span class="sc sc-under">3</span> under par <span class="sc sc-bogey">5</span> bogey <span class="sc sc-double">6</span> double+</p>`;
 }
 
+/* ---------- AI round summary ---------- */
+function aiBox(r) {
+  if (r.aiSummary) return `<div class="ai-box" id="aiBox"><div class="ai-head">✨ Coach's debrief</div>${escapeHtml(r.aiSummary).split(/\n+/).map(p => `<p>${p}</p>`).join('')}</div>`;
+  return `<div class="ai-box empty" id="aiBox"><div><div class="ai-head">✨ Coach's debrief</div><p class="small muted mb0">A plain-English breakdown of where the strokes went and what to practise this week.${Cloud.user ? '' : ' Needs a free account.'}</p></div><button class="btn primary sm" data-action="aiSummary" data-id="${r.id}">Write it</button></div>`;
+}
+
+/* What the coach sees: this round, the player's level and benchmark, and drills to choose from. */
+function aiPayload(r) {
+  const idx = r.indexUsed ?? App.index(); const target = App.targetHcp(); const b = benchmarkFor(target);
+  const nine = r.holesPlayed === 9;
+  const st = nine ? null : roundStats([{ ...r, diff: null }], 1);
+  const areas = st ? strokeLossAnalysis(st, target) : strokeLossAnalysis(roundStats(App.rounds(), 10), target);
+  const drills = recommendDrills(areas, 3).flatMap(x => x.drills.map(d => ({ name: d.name, area: x.area.label, goal: d.goal })));
+  return {
+    round: { date: r.date, course: r.course, holesPlayed: nine ? 9 : 18, nine: r.nine || null, par: r.par, grossScore: r.grossScore ?? r.score, adjustedScore: r.score,
+      differential: r.diff != null ? r.diff : null, putts: r.putts, greensInRegulation: r.gir, fairwaysHit: r.firHit, fairwaysPossible: r.firPossible, penalties: r.penalties,
+      threePutts: r.threePutts, doublesOrWorse: r.doubles, upAndDowns: r.udAtt ? `${r.udMade}/${r.udAtt}` : null, sandSaves: r.sandAtt ? `${r.sandMade}/${r.sandAtt}` : null, notes: r.notes || null,
+      holes: r.holes ? r.holes.map((h, i) => ({ hole: (r.firstHole || 0) + i + 1, par: r.pars[i], strokes: h.strokes, putts: h.putts, teeShot: h.fir, penalties: h.pen || 0, bunker: !!h.sand })) : null },
+    player: { handicapIndex: idx, targetHandicap: target, level: App.tier().label },
+    benchmarkForTarget: { handicap: b.label, putts: b.putts, girPercent: b.gir, fairwayPercent: b.fir, scramblingPercent: b.scrambling, threePutts: b.threePutts, penalties: b.penalties, doubles: b.doubles },
+    estimatedStrokesLost: areas.filter(a => a.loss > 0).map(a => ({ area: a.label, strokes: a.loss })),
+    drillsToChooseFrom: drills.length ? drills : DRILLS.slice(0, 6).map(d => ({ name: d.name, area: categoryLabel(d.category), goal: d.goal })),
+  };
+}
+
 /* Edit form for a quick-logged (totals only) round. */
 function editRoundForm(r) {
   const f = (name, label, v, attrs) => `<div class="field"><label>${label}</label><input name="${name}" value="${v == null ? '' : escapeHtml(v)}" ${attrs || 'type="number" min="0"'}></div>`;
@@ -249,6 +274,7 @@ function roundCardModal(r) {
     ${scorecardTable(r.holes, r.pars, r.si, r.firstHole)}
     ${s ? `<p class="small mt mb0">${s.dist.eagle + s.dist.birdie} birdies or better · ${s.dist.par} pars · ${s.dist.bogey} bogeys · ${s.dist.double + s.dist.triple} doubles+</p>` : ''}
     ${r.notes ? `<p class="small mt mb0"><strong>Notes:</strong> ${escapeHtml(r.notes)}</p>` : ''}
+    ${aiBox(r)}
     <div class="btn-row mt"><button class="btn" data-action="editRound" data-id="${r.id}">✎ Edit round</button></div>`;
 }
 
@@ -291,6 +317,7 @@ Object.assign(Actions, {
       ${r.score !== r.grossScore ? `<div class="callout info small">Adjusted to <strong>${r.score}</strong> for handicap (holes capped at net double bogey).</div>` : ''}
       <div class="stat-row mb">${statBox('Differential', fmt1(r.diff))}${statBox('Index', idx != null ? fmt1(idx) : '—', prevIdx != null && idx != null && idx !== prevIdx ? (idx < prevIdx ? '▼ ' : '▲ ') + fmt1(Math.abs(idx - prevIdx)) : '')}${statBox('Putts', r.putts ?? '—')}${statBox('GIR', r.gir ?? '—')}</div>
       ${scorecardTable(r.holes, r.pars, r.si, r.firstHole)}
+      ${aiBox(r)}
       <div class="btn-row mt"><button class="btn primary" data-action="closeModal">Done</button><button class="btn" data-action="goto" data-href="#/stats">See stats</button></div>`);
     announceAchievements(before);
   },

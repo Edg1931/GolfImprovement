@@ -179,6 +179,20 @@ const App = {
 const Actions = {
   closeModal() { App.closeModal(); },
   goto(el) { App.closeModal(); location.hash = el.dataset.href; },
+  async aiSummary(el) {
+    const r = App.state.rounds.find(x => x.id === el.dataset.id); if (!r) return;
+    if (!Cloud.user) { App.closeModal(); location.hash = '#/account'; App.toast('Create a free account to get AI round summaries'); return; }
+    const box = document.getElementById('aiBox');
+    const show = html => { const b = document.getElementById('aiBox'); if (b) b.outerHTML = html; else App.modal(html); };
+    if (box) box.innerHTML = '<p class="small muted mb0"><span class="spinner"></span> Your coach is reviewing the round…</p>';
+    const full = App.rounds().find(x => x.id === r.id);
+    try {
+      const res = await fetch('api/summary', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + await Cloud.accessToken() }, body: JSON.stringify(aiPayload(full)) });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error({ not_configured: 'AI summaries are not switched on yet (the site needs an Anthropic API key).', daily_limit: `You've used today's ${body.limit || 10} summaries. More tomorrow!`, sign_in_required: 'Please sign in again.', refused: 'The coach could not write a summary for this round.', busy: 'The coach is busy. Try again in a minute.' }[body.error] || 'Could not write the summary. Try again shortly.');
+      r.aiSummary = body.summary; Store.save(); show(aiBox(r));
+    } catch (e) { show(`<div class="ai-box empty" id="aiBox"><p class="small mb0">${escapeHtml(e.message)}</p><button class="btn sm" data-action="aiSummary" data-id="${r.id}">Try again</button></div>`); }
+  },
   startTodaySession(el) { const day = App.weekPlan().plan.find(d => d.session && d.session.id === el.dataset.sid); const s = day && day.session; if (!s) return; App.ui.sessionDrills = s.drills.map(([id]) => ({ id, result: '' })); App.ui.sessionType = s.type; location.hash = '#/sessions'; App.toast(s.name + ': drills loaded. Log scores as you go.'); },
   openDrill(el) { const d = getDrill(el.dataset.id); if (d) App.modal(drillModal(d)); },
   toggleFav(el) { const f = App.state.favorites; const i = f.indexOf(el.dataset.id); i >= 0 ? f.splice(i, 1) : f.push(el.dataset.id); Store.save(); if (document.getElementById('modalHost')) Actions.openDrill(el); App.render(); },

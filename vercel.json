@@ -1,0 +1,6 @@
+{
+  "functions": {
+    "api/summary.js": { "maxDuration": 60 },
+    "api/courses.js": { "maxDuration": 15 }
+  }
+}

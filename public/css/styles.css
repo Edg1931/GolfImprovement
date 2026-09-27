@@ -566,6 +566,11 @@ canvas.spark { width: 110px; height: 30px; display: block; }
 .sync-status.syncing { color: var(--blue); }
 .sync-status.error, .sync-status.offline { color: var(--amber); }
 
+.ai-box { margin-top: 14px; padding: 14px 16px; border-radius: 12px; background: linear-gradient(135deg, var(--gold-soft), var(--surface) 85%); border: 1px solid color-mix(in srgb, var(--gold) 35%, var(--border)); }
+.ai-box.empty { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.ai-head { font-size: .72rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--gold); margin-bottom: 6px; }
+.ai-box p:last-child { margin-bottom: 0; }
+
 /* ---------- Course search ---------- */
 .search-row { display: flex; gap: 8px; }
 .search-row input { flex: 1; min-width: 0; font: inherit; padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); min-height: 44px; }
