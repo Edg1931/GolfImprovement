@@ -318,7 +318,7 @@ Object.assign(Actions, {
     App.ui.playCourse = (existing || course).id; App.ui.cs = null; Store.save(); App.render();
     App.toast(`${course.name} (${course.tees}) added to your library`);
   },
-  deleteCourse(el) { if (!confirm('Remove this course from your library?')) return; App.state.courses = App.state.courses.filter(c => c.id !== el.dataset.id); if (App.ui.playCourse === el.dataset.id) App.ui.playCourse = null; Store.save(); App.render(); },
+  deleteCourse(el) { if (!confirm('Remove this course from your library?')) return; App.state.courses = App.state.courses.filter(c => c.id !== el.dataset.id); Store.tombstone(el.dataset.id); if (App.ui.playCourse === el.dataset.id) App.ui.playCourse = null; Store.save(); App.render(); },
   viewCard(el) { const r = App.rounds().find(x => x.id === el.dataset.id); if (r) App.modal(roundCardModal(r)); },
   gpsMark() {
     App.locate(pos => { App.ui.gps = Object.assign(App.ui.gps || {}, { start: pos, last: null }); App.render(); App.toast('Position marked (±' + Math.round(pos.acc * 1.09) + ' yds)'); });

@@ -1,10 +1,10 @@
 /* Offline support: app shell is cached on install; everything else is served
    network-first and cached as it is fetched, so the app works on the course with no signal. */
-const CACHE = 'fairwaylab-v3';
+const CACHE = 'fairwaylab-v4';
 const SHELL = [
   './', 'index.html', 'css/styles.css', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png',
   'js/data/drills.js', 'js/data/plans.js', 'js/data/content.js', 'js/store.js', 'js/handicap.js',
-  'js/charts.js', 'js/views.js', 'js/app.js', 'js/scorecard.js',
+  'js/charts.js', 'js/views.js', 'js/app.js', 'js/scorecard.js', 'js/config.js', 'js/cloud.js', 'js/social.js', 'js/vendor/supabase.js',
 ];
 
 self.addEventListener('install', e => {
@@ -19,6 +19,7 @@ self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
+  if (url.pathname.startsWith('/api/')) return;   // live data only
   const cacheable = url.origin === location.origin || url.hostname.endsWith('fonts.googleapis.com') || url.hostname.endsWith('fonts.gstatic.com');
   if (!cacheable) return;
   e.respondWith(

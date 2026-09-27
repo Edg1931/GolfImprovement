@@ -544,6 +544,28 @@ canvas.spark { width: 110px; height: 30px; display: block; }
 .adapt-box.on { border-style: solid; border-color: color-mix(in srgb, var(--gold) 45%, var(--border)); background: var(--gold-soft); }
 .focus-tag { display: inline-block; padding: 0 6px; border-radius: 5px; font-size: .64rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; background: var(--gold); color: #fff; vertical-align: 1px; }
 
+.card.narrow { max-width: 480px; }
+.code-pill { font-family: var(--mono); letter-spacing: .12em; background: var(--surface-2); border: 1px solid var(--border); padding: 2px 8px; border-radius: 6px; }
+.code-big { font-family: var(--mono); font-size: 2rem; font-weight: 700; letter-spacing: .18em; text-align: center; padding: 14px; margin: 6px 0 14px; border-radius: 12px; background: var(--green-100); color: var(--accent); border: 1px dashed color-mix(in srgb, var(--accent) 40%, transparent); }
+.leaderboard { list-style: none; margin: 0; padding: 0; }
+.leaderboard li { display: grid; grid-template-columns: 34px 1fr auto 36px; align-items: center; gap: 10px; padding: 10px 6px; border-bottom: 1px solid var(--border); }
+.leaderboard li:last-child { border-bottom: 0; }
+.leaderboard li.me { background: var(--green-100); border-radius: 10px; }
+.lb-rank { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: .85rem; background: var(--surface-2); color: var(--text-muted); }
+.lb-rank.top1 { background: linear-gradient(135deg, #f1d57a, #c39a2b); color: #3a2a00; }
+.lb-rank.top2 { background: linear-gradient(135deg, #e7eaec, #aeb4b9); color: #2b2f33; }
+.lb-rank.top3 { background: linear-gradient(135deg, #f0c09a, #b87333); color: #3a1d05; }
+.lb-name { font-weight: 650; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-val { font-family: var(--display); font-size: 1.15rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.acct-chip { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); font-size: .88rem; }
+.acct-chip > span { display: flex; flex-direction: column; min-width: 0; }
+.acct-chip strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sync-status { font-size: .74rem; font-weight: 650; color: var(--text-muted); }
+.sync-status.synced { color: var(--green-600); }
+.sync-status.synced::before { content: "✓ "; }
+.sync-status.syncing { color: var(--blue); }
+.sync-status.error, .sync-status.offline { color: var(--amber); }
+
 /* ---------- Course search ---------- */
 .search-row { display: flex; gap: 8px; }
 .search-row input { flex: 1; min-width: 0; font: inherit; padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); min-height: 44px; }

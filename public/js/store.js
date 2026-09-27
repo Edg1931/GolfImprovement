@@ -19,6 +19,8 @@ const Store = {
       courses: [],       // {id, name, tees, rating, slope, pars:[18], si:[18]}
       liveRound: null,   // in-progress hole-by-hole round (see scorecard.js)
       settings: { theme: '' },  // '' follows the system setting
+      deleted: {},       // {id: isoDate} tombstones so deletions sync across devices
+      meta: { updatedAt: '' },
     };
   },
   load() {
@@ -35,10 +37,24 @@ const Store = {
     return this.state;
   },
   rev: 0,
+  onSave: null,      // set by the cloud sync layer
   save() {
     this.rev++;
+    this.state.meta = Object.assign({}, this.state.meta, { updatedAt: new Date().toISOString() });
+    if (this.onSave) this.onSave();
     try { localStorage.setItem(STORE_KEY, JSON.stringify(this.state)); } catch (e) { console.warn('Could not save', e); }
   },
+  /* Swap in a whole state (e.g. merged from the cloud) without marking it as a new local edit. */
+  replace(next) {
+    const d = this.defaults();
+    this.state = Object.assign(d, next); this.state.profile = Object.assign(d.profile, next.profile || {}); this.state.settings = Object.assign(d.settings, next.settings || {});
+    if (!this.state.clubs) this.state.clubs = DEFAULT_CLUBS.map(c => ({ ...c }));
+    if (!this.state.routine) this.state.routine = DEFAULT_ROUTINE.slice();
+    this.rev++; if (typeof App !== 'undefined') App.state = this.state;
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(this.state)); } catch (e) { console.warn('Could not save', e); }
+  },
+  /* Record that an item was deleted, so sync removes it everywhere. */
+  tombstone(id) { this.state.deleted = this.state.deleted || {}; this.state.deleted[id] = todayISO(); },
   export() { return JSON.stringify(this.state, null, 2); },
   import(json) {
     const parsed = JSON.parse(json);
@@ -46,7 +62,12 @@ const Store = {
     this.state = Object.assign(this.defaults(), parsed);
     this.save();
   },
-  reset() { localStorage.removeItem(STORE_KEY); this.load(); },
+  reset() {
+    // keep tombstones for everything, so a signed-in reset also clears the cloud copy
+    const gone = Object.assign({}, this.state.deleted);
+    ['rounds', 'sessions', 'assessments', 'courses'].forEach(k => (this.state[k] || []).forEach(x => { gone[x.id] = todayISO(); }));
+    localStorage.removeItem(STORE_KEY); this.load(); this.state.deleted = gone; this.save();
+  },
 };
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }

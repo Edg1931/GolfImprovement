@@ -22,6 +22,8 @@ const App = {
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && this._wantAwake) this.keepAwake(true); });
     if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => { /* offline support unavailable */ });
     window.addEventListener('resize', () => { clearTimeout(this._rz); this._rz = setTimeout(() => this.runAfter(), 150); });
+    Store.onSave = () => Cloud.schedulePush();
+    Cloud.init().catch(e => console.warn('Cloud sync unavailable', e));
     if (!location.hash) location.hash = '#/dashboard';
     this.render();
     if (!this.state.profile.onboarded) this.modal(onboardingModal());
@@ -102,6 +104,10 @@ const App = {
     document.querySelectorAll('[data-route]').forEach(a => { const on = a.dataset.route === route || (a.dataset.also || '').split(' ').includes(route); a.classList.toggle('active', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     const idx = this.index(); document.getElementById('topIndex').innerHTML = `<small>HI</small> ${idx != null ? fmt1(idx) : '—'}`;
     document.getElementById('liveDot').classList.toggle('hidden', !this.state.liveRound);
+    document.getElementById('sidebarFoot').innerHTML = Cloud.user
+      ? `<a class="acct-chip" href="#/account"><svg class="ico"><use href="#i-user"/></svg><span><strong>${escapeHtml((Cloud.profile && Cloud.profile.display_name) || Cloud.user.email)}</strong><span id="syncStatus" class="sync-status ${Cloud.status}"></span></span></a>`
+      : `<p class="muted small mb0">Your data is only on this device. <a href="#/account">Create a free account</a> to back it up and sync.</p>`;
+    Cloud.renderStatus();
     if (changed) {
       this.toggleMenu(false);
       window.scrollTo({ top: 0 });
@@ -191,9 +197,9 @@ const Actions = {
       if (txt) d.result = txt.value;
     });
   },
-  deleteRound(el) { if (!confirm('Delete this round?')) return; App.state.rounds = App.state.rounds.filter(r => r.id !== el.dataset.id); Store.save(); App.render(); },
-  deleteSession(el) { if (!confirm('Delete this session?')) return; App.state.sessions = App.state.sessions.filter(r => r.id !== el.dataset.id); Store.save(); App.render(); },
-  deleteAssessment(el) { if (!confirm('Delete this test?')) return; App.state.assessments = App.state.assessments.filter(r => r.id !== el.dataset.id); Store.save(); App.render(); },
+  deleteRound(el) { if (!confirm('Delete this round?')) return; App.state.rounds = App.state.rounds.filter(r => r.id !== el.dataset.id); Store.tombstone(el.dataset.id); Store.save(); App.render(); },
+  deleteSession(el) { if (!confirm('Delete this session?')) return; App.state.sessions = App.state.sessions.filter(r => r.id !== el.dataset.id); Store.tombstone(el.dataset.id); Store.save(); App.render(); },
+  deleteAssessment(el) { if (!confirm('Delete this test?')) return; App.state.assessments = App.state.assessments.filter(r => r.id !== el.dataset.id); Store.tombstone(el.dataset.id); Store.save(); App.render(); },
   statsWindow(el) { App.ui.statsWindow = parseInt(el.dataset.n, 10); App.render(); },
   drillCat(el) { App.ui.drillCat = el.dataset.cat; App.render(); },
   drillFav() { App.ui.drillFav = !App.ui.drillFav; App.render(); },
@@ -292,7 +298,7 @@ const Changes = {
   commit(el) { App.state.commitments[el.dataset.key] = el.checked; Store.save(); App.render(); },
   importFile(el) {
     const f = el.files[0]; if (!f) return; const rd = new FileReader();
-    rd.onload = () => { try { Store.import(rd.result); App.state = Store.state; App.applyTheme(); App.render(); App.toast('Backup imported'); } catch (e) { App.toast('Import failed: ' + e.message); } };
+    rd.onload = () => { try { Store.import(rd.result); App.state = Store.state; Store.save(); App.applyTheme(); App.render(); App.toast('Backup imported'); } catch (e) { App.toast('Import failed: ' + e.message); } };
     rd.readAsText(f);
   },
 };
