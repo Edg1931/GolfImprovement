@@ -24,6 +24,7 @@ const App = {
     window.addEventListener('resize', () => { clearTimeout(this._rz); this._rz = setTimeout(() => this.runAfter(), 150); });
     if (!location.hash) location.hash = '#/dashboard';
     this.render();
+    if (!this.state.profile.onboarded) this.modal(onboardingModal());
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => this.runAfter());   // redraw charts in the web font
   },
 
@@ -34,7 +35,17 @@ const App = {
   },
   /* 18-hole rounds only, for per-round averages and score charts. */
   fullRounds() { return this.rounds().filter(r => r.holesPlayed !== 9); },
-  index() { return computeIndex(this.rounds()); },
+  /* Handicap Index: WHS calculation with caps; before 3 scores, the starting index the player entered. */
+  indexInfo() {
+    const key = Store.rev + ':' + this.state.rounds.length + ':' + this.state.profile.startIndex;
+    if (this._idxKey !== key) {
+      const info = cappedIndex(this.rounds());
+      if (info.index == null && this.state.profile.startIndex != null) { info.index = this.state.profile.startIndex; info.starting = true; }
+      this._idxKey = key; this._idx = info;
+    }
+    return this._idx;
+  },
+  index() { return this.indexInfo().index; },
   countedDiffs() {
     const rs = this.rounds().filter(r => r.diff != null).slice(0, 20); const rule = whsRule(rs.length); if (!rule) return [];
     return rs.slice().sort((a, b) => a.diff - b.diff).slice(0, rule.use).map(r => r.id);
@@ -182,6 +193,8 @@ const Actions = {
   randomDrill() { const cat = document.getElementById('randCat').value; App.ui.randCat = cat; const pool = cat === 'all' ? DRILLS : drillsByCategory(cat); App.ui.randDrill = pool[Math.floor(Math.random() * pool.length)].id; App.render(); },
   exportData() { const blob = new Blob([Store.export()], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'fairway-lab-backup-' + todayISO() + '.json'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); },
   resetData() { if (!confirm('Delete ALL rounds, sessions, tests and settings? This cannot be undone.')) return; Store.reset(); App.state = Store.state; App.ui = {}; App.render(); App.toast('All data deleted'); },
+  skipOnboarding() { App.state.profile.onboarded = true; Store.save(); App.closeModal(); App.render(); },
+  onboardDemo() { App.state.profile.onboarded = true; loadDemoData(); Store.save(); App.closeModal(); App.render(); App.toast('Demo data loaded. Clear it any time in Tools.'); },
   loadDemo() { if (App.state.rounds.length && !confirm('This adds demo rounds, sessions and a skills test alongside your existing data. Continue?')) return; loadDemoData(); Store.save(); App.render(); App.toast('Demo data loaded'); },
 };
 
@@ -214,7 +227,15 @@ const Forms = {
     App.state.assessments.push({ id: uid(), date: v.date, results }); Store.save(); App.render(); App.toast('Skills test saved'); announceAchievements(before);
   },
   goals(form, v) {
-    const p = App.state.profile; p.name = v.name.trim(); p.homeCourse = v.homeCourse.trim(); p.targetIndex = num(v.targetIndex, null); p.targetDate = v.targetDate; Store.save(); App.render(); App.toast('Goal saved');
+    const p = App.state.profile; p.name = v.name.trim(); p.homeCourse = v.homeCourse.trim(); p.targetIndex = num(v.targetIndex, null); p.targetDate = v.targetDate; p.startIndex = num(v.startIndex, null); Store.save(); App.render(); App.toast('Goal saved');
+  },
+  onboard(form, v) {
+    const p = App.state.profile;
+    p.name = (v.name || '').trim(); p.startIndex = num(v.startIndex, null); p.budget = v.budget || 'standard'; p.onboarded = true;
+    const t = num(v.targetIndex, null); p.targetIndex = t != null ? t : (p.startIndex != null ? Math.max(0, Math.round((p.startIndex - 4) * 10) / 10) : null);
+    if (p.targetIndex != null && !p.targetDate) { const d = new Date(); d.setMonth(d.getMonth() + 6); p.targetDate = d.toISOString().slice(0, 10); }
+    Store.save(); App.closeModal(); App.render();
+    App.toast(p.startIndex != null ? `Welcome${p.name ? ', ' + p.name : ''}! Starting at ${fmt1(p.startIndex)}.` : 'Welcome! Log 3 rounds to get your index.');
   },
   clubQuery(form, v) {
     const dist = num(v.dist, 150), wind = num(v.wind, 0), elev = num(v.elev, 0), cond = num(v.cond, 0);

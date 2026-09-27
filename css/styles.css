@@ -485,6 +485,8 @@ canvas.chart.tall { height: 300px; }
 .toggle.on span { background: var(--accent); }
 .toggle.on span::after { transform: translateX(16px); }
 .nav-row { flex-wrap: nowrap; }
+.notes-box { width: 100%; font: inherit; padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); resize: vertical; }
+.notes-box:focus { outline: none; box-shadow: 0 0 0 3px var(--ring); border-color: var(--accent); }
 .gps-read { font-size: 1rem; margin: 6px 0 14px; }
 .gps-read .big { font-family: var(--display); font-size: 2.6rem; font-weight: 600; letter-spacing: -.02em; }
 
@@ -509,6 +511,23 @@ table.scorecard thead th:last-child { border-radius: 0 8px 0 0; background: var(
 .miss-bar .l { background: color-mix(in srgb, var(--amber) 30%, var(--surface)); }
 .miss-bar .h { background: var(--green-500); color: #fff; }
 .miss-bar .r { background: color-mix(in srgb, var(--blue) 30%, var(--surface)); }
+
+.holes-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.holes-tile { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 16px 10px; border-radius: 14px; border: 2px solid var(--border-strong); background: var(--surface-2); font: inherit; font-weight: 650; color: var(--text-muted); cursor: pointer; transition: border-color .15s, background .15s, color .15s, transform .1s; }
+.holes-tile:active { transform: scale(.98); }
+.holes-tile .holes-num { font-family: var(--display); font-size: 2.6rem; font-weight: 600; line-height: 1; color: var(--text); }
+.holes-tile.active { border-color: var(--accent); background: var(--green-100); color: var(--accent); }
+.holes-tile.active .holes-num { color: var(--accent); }
+.holes-tile[disabled] { opacity: .4; cursor: not-allowed; }
+
+.welcome { text-align: center; margin-bottom: 14px; }
+.welcome img { border-radius: 14px; box-shadow: var(--shadow); margin-bottom: 10px; }
+.seg-opt { flex: 1; cursor: pointer; }
+.seg-opt input { position: absolute; opacity: 0; pointer-events: none; }
+.seg-opt span { display: flex; flex-direction: column; align-items: center; padding: 9px 6px; border-radius: 10px; font-weight: 650; color: var(--text-muted); transition: background .15s, color .15s, box-shadow .15s; }
+.seg-opt small { font-size: .7rem; font-weight: 500; }
+.seg-opt input:checked + span { background: var(--surface); color: var(--accent); box-shadow: var(--shadow); }
+.seg-opt input:focus-visible + span { outline: 2px solid var(--ring); }
 
 /* ---------- Course search ---------- */
 .search-row { display: flex; gap: 8px; }

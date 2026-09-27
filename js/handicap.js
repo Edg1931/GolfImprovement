@@ -232,3 +232,24 @@ function yardsBetween(a, b) {
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLon / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(h)) * 1.09361;
 }
+
+/* WHS caps. Once 20 scores exist, the Low Handicap Index (LHI) is the lowest index in the
+   365 days before the latest score. An increase of more than 3.0 over the LHI is halved
+   (soft cap) and the index can never exceed LHI + 5.0 (hard cap). */
+function cappedIndex(roundsNewestFirst) {
+  const raw = computeIndex(roundsNewestFirst);
+  const out = { index: raw, raw, lhi: null, cap: null };
+  if (raw == null || roundsNewestFirst.filter(r => r.diff != null).length < 20) return out;
+  const hist = indexHistory(roundsNewestFirst);
+  const latest = roundsNewestFirst[0].date;
+  const from = new Date(new Date(latest + 'T00:00:00').getTime() - 365 * 86400000).toISOString().slice(0, 10);
+  // only revisions made once the player had 20 scores (earlier ones carry the small-sample adjustments)
+  const lows = hist.slice(19, -1).filter(h => h.index != null && h.date >= from && h.date <= latest).map(h => h.index);
+  if (!lows.length) return out;
+  const lhi = Math.min(...lows); out.lhi = lhi;
+  let idx = raw;
+  if (idx - lhi > 3) { idx = lhi + 3 + (idx - lhi - 3) / 2; out.cap = 'soft'; }
+  if (idx - lhi > 5) { idx = lhi + 5; out.cap = 'hard'; }
+  out.index = Math.round(idx * 10) / 10;
+  return out;
+}

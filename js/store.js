@@ -5,7 +5,7 @@ const Store = {
   state: null,
   defaults() {
     return {
-      profile: { name: '', targetIndex: null, targetDate: '', tierOverride: '', budget: 'standard', homeCourse: '' },
+      profile: { name: '', targetIndex: null, targetDate: '', tierOverride: '', budget: 'standard', homeCourse: '', startIndex: null, onboarded: false },
       rounds: [],        // {id, date, course, tees, par, rating, slope, score, putts, firHit, firPossible, gir, penalties, udAtt, udMade, sandAtt, sandMade, threePutts, doubles, notes}
       sessions: [],      // {id, date, minutes, type, drills:[{id, result}], notes}
       assessments: [],   // {id, date, results:{testId: n}}
@@ -29,11 +29,14 @@ const Store = {
     this.state.profile = Object.assign(d.profile, (s && s.profile) || {});
     this.state.settings = Object.assign(d.settings, (s && s.settings) || {});
     if (!Array.isArray(this.state.courses)) this.state.courses = [];
+    if (s && !s.profile?.onboarded && (this.state.rounds.length || this.state.sessions.length)) this.state.profile.onboarded = true;   // existing users skip the welcome
     if (!this.state.clubs) this.state.clubs = DEFAULT_CLUBS.map(c => ({ ...c }));
     if (!this.state.routine) this.state.routine = DEFAULT_ROUTINE.slice();
     return this.state;
   },
+  rev: 0,
   save() {
+    this.rev++;
     try { localStorage.setItem(STORE_KEY, JSON.stringify(this.state)); } catch (e) { console.warn('Could not save', e); }
   },
   export() { return JSON.stringify(this.state, null, 2); },

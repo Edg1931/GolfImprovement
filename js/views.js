@@ -13,10 +13,34 @@ function drillCard(d, compact) {
     <div class="drill-meta"><span>⏱ ${d.minutes} min</span><span>Difficulty ${dots(d.difficulty)}</span></div>
   </div>`;
 }
+/* Subtitle under the Handicap Index: how it was worked out. */
+function indexSub(rounds, trendText) {
+  const info = App.indexInfo(); const valid = rounds.filter(r => r.diff != null).length;
+  if (info.index == null) return `${valid}/3 scores needed`;
+  if (info.starting) return `Starting index · ${valid}/3 scores to calculate`;
+  const rule = whsRule(Math.min(valid, 20));
+  let t = trendText || ('best ' + rule.use + ' of last ' + Math.min(valid, 20));
+  if (info.cap) t += ` · ${info.cap} cap (low ${fmt1(info.lhi)}, uncapped ${fmt1(info.raw)})`;
+  return t;
+}
 function lowDiff(rounds) { const d = rounds.map(r => r.diff).filter(x => x != null).slice(0, 20); return d.length ? fmt1(Math.min(...d)) : '—'; }
 function holesLabel(r) { return r.holesPlayed === 9 ? ` <span class="badge neutral" title="Nine-hole round">${r.nine === 'back' ? 'B9' : r.nine === 'front' ? 'F9' : '9'}</span>` : ''; }
 function drillLink(id) { const d = getDrill(id); return d ? `<a href="#" data-action="openDrill" data-id="${d.id}">${escapeHtml(d.name)}</a>` : escapeHtml(id); }
 function statBox(label, value, sub, cls) { return `<div class="stat ${cls || ''}"><span class="label">${label}</span><span class="value">${value}</span>${sub ? `<span class="sub">${sub}</span>` : ''}</div>`; }
+function onboardingModal() {
+  return `<div class="welcome"><img src="icons/icon.svg" alt="" width="56" height="56"><p class="eyebrow">Welcome to Fairway Lab</p><h2>Let's set up your game</h2>
+    <p class="small muted">Thirty seconds now means your plan, targets and stats make sense from day one.</p></div>
+    <form class="form" data-form="onboard">
+      <div class="field"><label>Your first name</label><input name="name" autocomplete="given-name" placeholder="Optional"></div>
+      <div class="form-row">
+        <div class="field"><label>Current Handicap Index</label><input type="number" step="0.1" min="-10" max="54" name="startIndex" placeholder="e.g. 14.2" inputmode="decimal"><span class="hint">From your club or golf app. Leave blank if you don't have one.</span></div>
+        <div class="field"><label>Target index</label><input type="number" step="0.1" min="-10" max="54" name="targetIndex" placeholder="e.g. 9.9" inputmode="decimal"><span class="hint">Blank = 4 shots better in 6 months.</span></div>
+      </div>
+      <div class="field"><label>Time for practice each week</label><div class="seg">${TIME_BUDGETS.map(b => `<label class="seg-opt"><input type="radio" name="budget" value="${b.id}" ${b.id === 'standard' ? 'checked' : ''}><span>${b.label}<small>${b.hours}</small></span></label>`).join('')}</div></div>
+      <button class="btn primary lg" type="submit">Start improving →</button>
+      <div class="btn-row" style="justify-content:center"><button type="button" class="btn ghost sm" data-action="onboardDemo">Explore with demo data</button><button type="button" class="btn ghost sm" data-action="skipOnboarding">Skip</button></div>
+    </form>`;
+}
 function onboarding() {
   return `<div class="card accent"><h2>Welcome to Fairway Lab</h2>
     <p>A complete system for lowering your handicap: track rounds, find where you lose strokes, follow a schedule of measurable drills, and test your skills every few weeks.</p>
@@ -54,7 +78,7 @@ Views.dashboard = function () {
 
   html += `<div class="hero">
     <div class="card accent"><div class="stat-row">
-      ${statBox('Handicap Index', idx != null ? fmt1(idx) : '—', idx == null ? `${rounds.length}/3 rounds needed` : (trend != null ? (trend <= 0 ? '▼ ' : '▲ ') + fmt1(Math.abs(trend)) + ' vs 5 rounds ago' : 'Based on ' + Math.min(rounds.length, 20) + ' rounds'))}
+      ${statBox('Handicap Index', idx != null ? fmt1(idx) : '—', indexSub(rounds, trend != null ? (trend <= 0 ? '▼ ' : '▲ ') + fmt1(Math.abs(trend)) + ' vs 5 rounds ago' : null))}
       ${statBox('Target', p.targetIndex != null ? fmt1(p.targetIndex) : '—', p.targetDate ? 'by ' + fmtDate(p.targetDate) : '<a href="#/goals">Set a goal</a>')}
       ${statBox('Avg score (last 5)', st5 ? Math.round(st5.score) : '—', st5 ? 'best ' + Math.min(...App.fullRounds().slice(0, 5).map(r => r.grossScore ?? r.score)) : '')}
     </div>
@@ -117,7 +141,7 @@ Views.rounds = function () {
   const hist = indexHistory(rounds);
   let html = `<div class="page-head"><div><h1>Rounds &amp; Handicap</h1><p class="muted">Log every round with stats. Your Handicap Index follows the World Handicap System (best 8 of your last 20 differentials).</p></div></div>`;
   html += `<div class="grid grid-3">
-    <div class="card accent">${statBox('Handicap Index', idx != null ? fmt1(idx) : '—', idx == null ? `${rounds.length}/3 rounds needed` : 'best ' + whsRule(Math.min(rounds.length, 20)).use + ' of last ' + Math.min(rounds.length, 20))}</div>
+    <div class="card accent">${statBox('Handicap Index', idx != null ? fmt1(idx) : '—', indexSub(rounds))}</div>
     <div class="card">${statBox('Low differential', lowDiff(rounds), 'last 20 scores')}</div>
     <div class="card">${statBox('Avg score', App.fullRounds().length ? fmt1(avg(App.fullRounds().slice(0, 20).map(r => r.grossScore ?? r.score))) : '—', 'last 20 full rounds')}</div>
   </div>`;
@@ -161,7 +185,7 @@ Views.rounds = function () {
 
   html += `<div class="card mt"><div class="card-head"><h2>Round history</h2><span class="muted small">${rounds.length} rounds</span></div>
     ${rounds.length ? `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Course</th><th class="num">Score</th><th class="num">Rating/Slope</th><th class="num">Diff</th><th class="num">Putts</th><th class="num">FIR</th><th class="num">GIR</th><th class="num">Pen</th><th class="num">U&amp;D</th><th></th></tr></thead><tbody>
-    ${rounds.map((r, i) => `<tr class="${i < 20 && App.countedDiffs().includes(r.id) ? 'highlight' : ''}"><td class="nowrap">${fmtDate(r.date)}</td><td>${escapeHtml(r.course || '—')}${holesLabel(r)}${r.notes ? `<div class="tiny muted">${escapeHtml(r.notes)}</div>` : ''}</td><td class="num"><strong>${r.grossScore ?? r.score}</strong>${r.grossScore != null && r.grossScore !== r.score ? `<div class="tiny muted" title="Adjusted gross score used for handicap">adj ${r.score}</div>` : ''}</td><td class="num">${r.rating}/${r.slope}</td><td class="num" ${r.holesPlayed === 9 ? 'title="18-hole equivalent (WHS nine-hole rule)"' : ''}>${fmt1(r.diff)}</td><td class="num">${r.putts ?? '—'}</td><td class="num">${r.firHit != null ? r.firHit + '/' + r.firPossible : '—'}</td><td class="num">${r.gir ?? '—'}</td><td class="num">${r.penalties ?? '—'}</td><td class="num">${r.udAtt ? r.udMade + '/' + r.udAtt : '—'}</td><td class="nowrap">${r.holes ? `<button class="btn sm" data-action="viewCard" data-id="${r.id}">Card</button>` : ''}<button class="btn sm ghost danger" data-action="deleteRound" data-id="${r.id}" title="Delete" aria-label="Delete round">✕</button></td></tr>`).join('')}
+    ${rounds.map((r, i) => `<tr class="${i < 20 && App.countedDiffs().includes(r.id) ? 'highlight' : ''}"><td class="nowrap">${fmtDate(r.date)}</td><td>${escapeHtml(r.course || '—')}${holesLabel(r)}${r.notes ? `<div class="tiny muted">${escapeHtml(r.notes)}</div>` : ''}</td><td class="num"><strong>${r.grossScore ?? r.score}</strong>${r.grossScore != null && r.grossScore !== r.score ? `<div class="tiny muted" title="Adjusted gross score used for handicap">adj ${r.score}</div>` : ''}</td><td class="num">${r.rating}/${r.slope}</td><td class="num" ${r.holesPlayed === 9 ? 'title="18-hole equivalent (WHS nine-hole rule)"' : ''}>${fmt1(r.diff)}</td><td class="num">${r.putts ?? '—'}</td><td class="num">${r.firHit != null ? r.firHit + '/' + r.firPossible : '—'}</td><td class="num">${r.gir ?? '—'}</td><td class="num">${r.penalties ?? '—'}</td><td class="num">${r.udAtt ? r.udMade + '/' + r.udAtt : '—'}</td><td class="nowrap">${r.holes ? `<button class="btn sm" data-action="viewCard" data-id="${r.id}">Card</button>` : `<button class="btn sm ghost" data-action="editRound" data-id="${r.id}" title="Edit" aria-label="Edit round">✎</button>`}<button class="btn sm ghost danger" data-action="deleteRound" data-id="${r.id}" title="Delete" aria-label="Delete round">✕</button></td></tr>`).join('')}
     </tbody></table></div><p class="tiny muted mt mb0">Highlighted rows are the differentials currently counting toward your index.</p>` : '<div class="empty">No rounds logged yet. Add your first round above.</div>'}
   </div>`;
 
@@ -456,6 +480,7 @@ Views.goals = function () {
   let html = `<div class="page-head"><div><h1>Goals</h1><p class="muted">A target, a date, and the habits that get you there. Realistic pace: 1–2 index points per quarter for most golfers who practise with purpose.</p></div></div>`;
   html += `<div class="grid grid-2"><div class="card"><h2>Set your target</h2><form class="form" data-form="goals">
     <div class="form-row"><div class="field"><label>Your name</label><input name="name" value="${escapeHtml(p.name)}" placeholder="Optional"></div><div class="field"><label>Home course</label><input name="homeCourse" value="${escapeHtml(p.homeCourse)}" placeholder="Optional"></div></div>
+    <div class="form-row"><div class="field"><label>Starting Handicap Index</label><input type="number" step="0.1" name="startIndex" value="${p.startIndex != null ? p.startIndex : ''}" placeholder="Optional"><span class="hint">Used until you've logged 3 rounds.</span></div></div>
     <div class="form-row"><div class="field"><label>Target Handicap Index</label><input type="number" step="0.1" name="targetIndex" value="${target != null ? target : ''}" placeholder="${idx != null ? fmt1(Math.max(0, idx - 3)) : '12.0'}" required></div><div class="field"><label>Target date</label><input type="date" name="targetDate" value="${date}" required></div></div>
     <button class="btn primary" type="submit">Save goal</button></form>
     ${idx == null ? '<div class="callout warn mt small">Log at least 3 rounds so we can measure the gap from your current index.</div>' : ''}</div>

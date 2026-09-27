@@ -71,8 +71,6 @@ Views.play = function () {
   return lr ? playLive(lr) : playSetup();
 };
 
-const HOLE_MODES = [['18', '18 holes'], ['front', 'Front 9'], ['back', 'Back 9']];
-
 /* Course search state lives in App.ui.cs: {q, loading, results, error, open}. */
 function courseSearchCard() {
   const cs = App.ui.cs || {};
@@ -87,7 +85,7 @@ function courseSearchCard() {
       <button class="course-hit" data-action="courseOpen" data-i="${ci}"><div><strong>${escapeHtml(c.name)}</strong><div class="tiny muted">${escapeHtml([c.city, c.state, c.country].filter(Boolean).join(', '))} · ${c.tees.length} tee${c.tees.length === 1 ? '' : 's'}</div></div><span class="chev" aria-hidden="true"></span></button>
       ${cs.open === ci ? `<div class="tee-list">${c.tees.length ? c.tees.map((t, ti) => `<button class="tee-opt" data-action="importTee" data-c="${ci}" data-t="${ti}"><span class="tee-swatch" style="background:${teeColor(t.name)}"></span><span><strong>${escapeHtml(t.name)}</strong>${t.gender === 'F' ? ' <span class="tiny muted">(W)</span>' : ''}<span class="tiny muted"> · ${t.rating ?? '—'}/${t.slope ?? '—'} · par ${t.par ?? sum(t.holes.map(h => h.par))}${t.yards ? ' · ' + t.yards + ' yds' : ''}${t.holes.length === 9 ? ' · 9 holes' : ''}</span></span><span class="btn sm primary">Use</span></button>`).join('') : '<p class="small muted">No scorecard data for this course.</p>'}</div>` : ''}
     </li>`).join('')}</ul>`;
-  return `<div class="card"><div class="card-head"><h2>Find your course</h2><span class="tag">Auto-fill</span></div>
+  return `<div class="card"><div class="card-head"><h2>Step 2 · Find your course</h2><span class="tag">Auto-fill</span></div>
     <p class="small muted">Search any course: rating, slope, par, stroke index and yardages fill in automatically.</p>
     <form class="search-row" data-form="courseSearch"><input type="search" name="q" value="${escapeHtml(cs.q || '')}" placeholder="Course or club name, e.g. Pebble Beach" aria-label="Search courses" minlength="3" required><button class="btn primary" type="submit">Search</button></form>
     ${body}</div>`;
@@ -114,14 +112,21 @@ function playSetup() {
   const nineOnly = c.pars.length === 9;
   let mode = App.ui.playHoles || '18'; if (nineOnly) mode = 'nine'; else if (mode === 'nine') mode = '18';
   const idx = App.index();
-  let html = `<div class="page-head"><div><p class="eyebrow">Live scorecard</p><h1>Play a round</h1><p class="muted">Find your course, choose 9 or 18, and tap in each hole. Fairways, greens, scrambling and your handicap-adjusted score are worked out for you.</p></div></div>`;
-  html += `<div class="grid grid-2"><div>${courseSearchCard()}
-  <div class="card mt"><h2>Tee it up</h2><form class="form" data-form="startRound">
+  let html = `<div class="page-head"><div><p class="eyebrow">Live scorecard</p><h1>Play a round</h1><p class="muted">Choose 9 or 18, find your course, and tap in each hole. Fairways, greens, scrambling and your handicap-adjusted score are worked out for you.</p></div></div>`;
+  html += `<div class="card holes-pick"><div class="entry-label">Step 1 · How many holes today?</div>
+    <div class="holes-tiles">
+      <button type="button" class="holes-tile ${mode === '18' ? 'active' : ''}" data-action="playHoles" data-v="18" ${nineOnly ? 'disabled' : ''}><span class="holes-num">18</span><span>Full round</span></button>
+      <button type="button" class="holes-tile ${mode !== '18' ? 'active' : ''}" data-action="playHoles" data-v="${mode === 'back' ? 'back' : 'front'}"><span class="holes-num">9</span><span>Quick nine</span></button>
+    </div>
+    ${mode === 'front' || mode === 'back' ? `<div class="seg mt">${[['front', 'Front 9 (holes 1–9)'], ['back', 'Back 9 (holes 10–18)']].map(([v, l]) => `<button type="button" class="${mode === v ? 'active' : ''}" data-action="playHoles" data-v="${v}">${l}</button>`).join('')}</div>` : ''}
+    ${nineOnly ? '<p class="small muted mt mb0">This is a 9-hole course.</p>' : ''}
+    ${mode !== '18' ? '<p class="tiny muted mt mb0">Nine-hole scores count toward your handicap using the official expected-score rule.</p>' : ''}
+  </div>
+  <div class="grid grid-2 mt"><div>${courseSearchCard()}
+  <div class="card mt"><h2>Step 3 · Tee it up</h2><form class="form" data-form="startRound">
     ${courses.length ? `<div class="field"><label>Course</label><select data-change="playCourse"><option value="">Enter a course by hand…</option>${courses.map(x => `<option value="${x.id}" ${sel && sel.id === x.id ? 'selected' : ''}>${escapeHtml(x.name)}${x.tees ? ' · ' + escapeHtml(x.tees) : ''}${x.pars.length === 9 ? ' (9 holes)' : ''}</option>`).join('')}</select></div>` : ''}
     ${sel ? `<div class="course-summary"><span class="tee-swatch lg" style="background:${teeColor(sel.tees)}"></span><div><strong>${escapeHtml(sel.name)}</strong><div class="small muted">${escapeHtml(sel.tees || 'Tees')} · rating ${sel.rating ?? '—'} · slope ${sel.slope ?? '—'} · par ${sum(sel.pars)}${sel.yards ? ' · ' + sum(sel.yards) + ' yds' : ''}</div></div></div>` : ''}
-    <div class="field"><label>Holes</label>
-      ${nineOnly ? '<div class="small">This is a 9-hole course.</div>' : `<div class="seg">${HOLE_MODES.map(([v, l]) => `<button type="button" class="${mode === v ? 'active' : ''}" data-action="playHoles" data-v="${v}">${l}</button>`).join('')}</div>`}
-      <input type="hidden" name="holesMode" value="${mode}"></div>
+    <input type="hidden" name="holesMode" value="${mode}">
     <div class="form-row">
       <div class="field"><label>Date</label><input type="date" name="date" value="${todayISO()}" required></div>
       ${sel ? '' : `<div class="field"><label>Course name</label><input name="course" value="${escapeHtml(c.name)}" placeholder="Course name" required></div>
@@ -166,7 +171,8 @@ function playLive(lr) {
     const strip = document.querySelector('.hole-strip'), pill = strip && strip.querySelector('.cur');
     if (pill) strip.scrollLeft = pill.offsetLeft - strip.clientWidth / 2 + pill.clientWidth / 2;
   });
-  let html = `<div class="live-head card accent">
+  let html = lr.editingId ? `<div class="callout info row-between"><span><strong>Editing a saved round.</strong> Change any hole, then save.</span><button class="btn sm" data-action="cancelEdit">Cancel</button></div>` : '';
+  html += `<div class="live-head card accent">
     <div class="row-between"><div><p class="eyebrow light">${escapeHtml(lr.course)}${lr.tees ? ' · ' + escapeHtml(lr.tees) : ''}${n === 9 ? ' · ' + (lr.mode === 'back' ? 'Back 9' : lr.mode === 'front' ? 'Front 9' : '9 holes') : ''}</p><div class="live-score"><span class="big">${t.thru ? toPar(t.toPar) : 'E'}</span><span class="muted">${t.strokes} strokes · thru ${t.thru}</span></div></div>
     <div class="live-mini">${lr.ch != null ? `<div><span>${toPar(t.netToPar)}</span>net</div><div><span>${t.pts}</span>pts</div>` : ''}<div><span>${t.putts}</span>putts</div></div></div>
     <div class="hole-strip" role="tablist" aria-label="Holes" style="grid-template-columns:repeat(${n}, minmax(34px, 1fr))">${lr.holes.map((x, k) => `<button class="hole-pill ${k === i ? 'cur' : ''} ${scoreClass(x.strokes, lr.pars[k])}" data-action="holeGo" data-i="${k}" aria-label="Hole ${no(k)}${x.strokes != null ? ', ' + x.strokes : ''}"><small>${no(k)}</small>${x.strokes != null ? x.strokes : '·'}</button>`).join('')}</div>
@@ -191,7 +197,7 @@ function playLive(lr) {
       <div><div class="entry-label">Greenside bunker</div><button class="toggle ${h.sand ? 'on' : ''}" data-action="holeToggleSand" aria-pressed="${!!h.sand}"><span></span>${h.sand ? 'Yes' : 'No'}</button></div></div>
 
     <div class="btn-row nav-row"><button class="btn" data-action="holeGo" data-i="${i - 1}" ${i === 0 ? 'disabled' : ''}>‹ Prev</button>
-      ${i < last ? `<button class="btn primary lg grow" data-action="holeGo" data-i="${i + 1}">Next hole ›</button>` : `<button class="btn primary lg grow" data-action="finishRound" ${complete ? '' : 'disabled'}>Finish round ✓</button>`}</div>
+      ${i < last ? `<button class="btn primary lg grow" data-action="holeGo" data-i="${i + 1}">Next hole ›</button>` : `<button class="btn primary lg grow" data-action="finishRound" ${complete ? '' : 'disabled'}>${lr.editingId ? 'Save changes ✓' : 'Finish round ✓'}</button>`}</div>
     ${i === last && !complete ? `<p class="tiny muted mb0">Enter a score on every hole to finish. Missing: ${lr.holes.map((x, k) => x.strokes == null ? no(k) : null).filter(Boolean).join(', ')}.</p>` : ''}
   </div>
 
@@ -202,7 +208,8 @@ function playLive(lr) {
       ${gps.shots && gps.shots.length ? `<p class="small mt mb0">This round: ${gps.shots.slice(-6).map(s => `<span class="badge neutral">${s} yds</span>`).join(' ')}</p>` : ''}
       <p class="tiny muted mt mb0">Phone GPS is accurate to about 3–5 yds in open sky.</p></div>
     <div class="card mt"><h3>Scorecard</h3>${scorecardTable(lr.holes, lr.pars, cardSi, first)}</div>
-    <div class="btn-row mt"><button class="btn ghost danger sm" data-action="discardRound">Discard round</button></div>
+    <div class="card mt"><h3>Round notes</h3><textarea class="notes-box" rows="3" data-change="liveNotes" placeholder="Conditions, what worked, what cost you strokes…">${escapeHtml(lr.notes || '')}</textarea></div>
+    ${lr.editingId ? '' : '<div class="btn-row mt"><button class="btn ghost danger sm" data-action="discardRound">Discard round</button></div>'}
   </div></div>`;
   return html;
 }
@@ -222,12 +229,27 @@ function scorecardTable(holes, pars, si, first) {
   return `<div class="table-wrap">${nine(0)}${holes.length > 9 ? nine(9) : ''}</div><p class="tiny muted mb0 sc-legend"><span class="sc sc-under">3</span> under par <span class="sc sc-bogey">5</span> bogey <span class="sc sc-double">6</span> double+</p>`;
 }
 
+/* Edit form for a quick-logged (totals only) round. */
+function editRoundForm(r) {
+  const f = (name, label, v, attrs) => `<div class="field"><label>${label}</label><input name="${name}" value="${v == null ? '' : escapeHtml(v)}" ${attrs || 'type="number" min="0"'}></div>`;
+  const nine = r.holesPlayed === 9;
+  return `<h2>Edit round</h2><form class="form" data-form="editRound"><input type="hidden" name="id" value="${r.id}">
+    <div class="form-row">${f('date', 'Date', r.date, 'type="date" required')}${f('course', 'Course', r.course, 'type="text"')}${f('tees', 'Tees', r.tees, 'type="text"')}</div>
+    <div class="form-row">${f('par', 'Par', r.par, 'type="number" required')}${f('rating', nine ? 'Rating (18-hole card)' : 'Course rating', nine ? Math.round(r.rating * 2 * 10) / 10 : r.rating, 'type="number" step="0.1" required')}${f('slope', 'Slope', r.slope, 'type="number" min="55" max="155" required')}${f('score', 'Score (adjusted)', r.score, 'type="number" required')}</div>
+    <div class="form-row">${f('putts', 'Putts', r.putts)}${f('firHit', 'Fairways hit', r.firHit)}${f('firPossible', 'Fairways possible', r.firPossible)}${f('gir', 'GIR', r.gir)}${f('penalties', 'Penalties', r.penalties)}</div>
+    <div class="form-row">${f('udAtt', 'U&D attempts', r.udAtt)}${f('udMade', 'U&D made', r.udMade)}${f('sandAtt', 'Sand att.', r.sandAtt)}${f('sandMade', 'Sand saves', r.sandMade)}${f('threePutts', '3-putts', r.threePutts)}${f('doubles', 'Doubles+', r.doubles)}</div>
+    <div class="field"><label>Notes</label><textarea name="notes" rows="2">${escapeHtml(r.notes || '')}</textarea></div>
+    <div class="btn-row"><button class="btn primary" type="submit">Save changes</button><button type="button" class="btn" data-action="closeModal">Cancel</button></div></form>`;
+}
+
 function roundCardModal(r) {
   const s = holeBreakdown([r]);
   return `<p class="eyebrow">${fmtDate(r.date)}</p><h2>${escapeHtml(r.course || 'Round')}</h2>
     <div class="stat-row mb">${statBox('Gross', r.grossScore ?? r.score, r.holesPlayed === 9 ? (r.nine === 'back' ? 'back nine' : 'front nine') : '')}${statBox('Adjusted', r.score, 'for handicap')}${statBox('Differential', fmt1(r.diff), r.holesPlayed === 9 ? '18-hole equivalent' : '')}${r.putts != null ? statBox('Putts', r.putts) : ''}</div>
     ${scorecardTable(r.holes, r.pars, r.si, r.firstHole)}
-    ${s ? `<p class="small mt mb0">${s.dist.eagle + s.dist.birdie} birdies or better · ${s.dist.par} pars · ${s.dist.bogey} bogeys · ${s.dist.double + s.dist.triple} doubles+</p>` : ''}`;
+    ${s ? `<p class="small mt mb0">${s.dist.eagle + s.dist.birdie} birdies or better · ${s.dist.par} pars · ${s.dist.bogey} bogeys · ${s.dist.double + s.dist.triple} doubles+</p>` : ''}
+    ${r.notes ? `<p class="small mt mb0"><strong>Notes:</strong> ${escapeHtml(r.notes)}</p>` : ''}
+    <div class="btn-row mt"><button class="btn" data-action="editRound" data-id="${r.id}">✎ Edit round</button></div>`;
 }
 
 /* ---------- Actions for the scorecard ---------- */
@@ -250,15 +272,19 @@ Object.assign(Actions, {
   discardRound() { if (!confirm('Discard this round? Scores entered so far will be lost.')) return; App.state.liveRound = null; App.ui.gps = null; App.keepAwake(false); Store.save(); App.render(); },
   finishRound() {
     const lr = App.state.liveRound; if (!lr || lr.holes.some(h => h.strokes == null)) return;
-    const before = unlockedIds(); const prevIdx = App.index();
+    const editing = lr.editingId ? App.state.rounds.find(x => x.id === lr.editingId) : null;
+    const before = unlockedIds(); const prevIdx = editing ? (editing.indexUsed ?? App.index()) : App.index();
     const st = statsFromHoles(lr.holes, lr.pars); const par = sum(lr.pars); const nine = lr.holes.length === 9;
-    const r = { id: uid(), date: lr.date, course: lr.course, tees: lr.tees, par, rating: lr.rating, slope: lr.slope,
+    const r = { id: editing ? editing.id : uid(), date: lr.date, course: lr.course, tees: lr.tees, par, rating: lr.rating, slope: lr.slope,
       score: adjustedGross(lr.holes, lr.pars, lr.si, lr.ch), grossScore: st.gross, holes: lr.holes.map(h => ({ ...h })), pars: lr.pars.slice(), si: (lr.siCard || lr.si).slice(),
       putts: st.putts, firHit: st.firHit, firPossible: st.firPossible, gir: st.gir, penalties: st.penalties, udAtt: st.udAtt, udMade: st.udMade,
-      sandAtt: st.sandAtt, sandMade: st.sandMade, threePutts: st.threePutts, doubles: st.doubles, notes: '' };
+      sandAtt: st.sandAtt, sandMade: st.sandMade, threePutts: st.threePutts, doubles: st.doubles, notes: (lr.notes || '').trim(),
+      ch: lr.ch, indexUsed: prevIdx, courseId: lr.courseId || null, mode: lr.mode, yards: lr.yards || null, siRank: lr.si.slice() };
     if (nine) { r.holesPlayed = 9; r.nine = lr.mode === 'back' ? 'back' : lr.mode === 'front' ? 'front' : null; r.firstHole = lr.first || 0; r.diff18 = nineHoleDifferential(r.score, r.rating, r.slope, prevIdx); }
-    App.state.rounds.push(r); App.state.liveRound = null; App.ui.gps = null; App.keepAwake(false); Store.save();
+    if (editing) App.state.rounds[App.state.rounds.indexOf(editing)] = r; else App.state.rounds.push(r);
+    App.state.liveRound = null; App.ui.gps = null; App.keepAwake(false); Store.save();
     location.hash = '#/rounds'; App.render();
+    if (editing) { App.closeModal(); App.toast('Round updated'); return; }
     const idx = App.index(); r.diff = nine ? r.diff18 : scoreDifferential(r.score, r.rating, r.slope);
     App.modal(`<div class="finish-hero"><span class="eyebrow">Round complete</span><div class="finish-score">${r.grossScore}</div><p class="muted">${toPar(r.grossScore - par)} · ${escapeHtml(r.course)}${nine ? ' · ' + (r.nine === 'back' ? 'back nine' : r.nine === 'front' ? 'front nine' : '9 holes') : ''}</p></div>
       ${nine ? `<div class="callout small">${r.diff18 != null ? `Nine-hole score converted to an 18-hole differential of <strong>${fmt1(r.diff18)}</strong> using your expected score for the other nine.` : 'Nine-hole rounds count toward your index once you have one (3 full rounds).'}</div>` : ''}
@@ -268,6 +294,20 @@ Object.assign(Actions, {
       <div class="btn-row mt"><button class="btn primary" data-action="closeModal">Done</button><button class="btn" data-action="goto" data-href="#/stats">See stats</button></div>`);
     announceAchievements(before);
   },
+  /* Reopen a saved round: hole-by-hole rounds go back into the scorecard, quick-logged ones get a form. */
+  editRound(el) {
+    const r = App.state.rounds.find(x => x.id === el.dataset.id); if (!r) return;
+    if (!r.holes) { App.modal(editRoundForm(r)); return; }
+    if (App.state.liveRound && !confirm('You have a round in progress. Replace it with this round for editing?')) return;
+    const n = r.holes.length;
+    App.state.liveRound = { id: uid(), editingId: r.id, date: r.date, courseId: r.courseId || null, course: r.course, tees: r.tees, rating: r.rating, slope: r.slope,
+      mode: r.mode || (n === 9 ? (r.nine || 'nine') : '18'), first: r.firstHole || 0, pars: r.pars.slice(), siCard: r.si.slice(),
+      si: r.siRank ? r.siRank.slice() : (n === 9 ? rankStrokeIndex(r.si) : r.si.slice()),
+      ch: r.ch !== undefined ? r.ch : (App.index() != null ? (n === 9 ? courseHandicap9(App.index(), r.slope, r.rating, sum(r.pars)) : courseHandicap(App.index(), r.slope, r.rating, sum(r.pars))) : null),
+      yards: r.yards || null, notes: r.notes || '', cur: 0, holes: r.holes.map(h => ({ ...h })) };
+    Store.save(); App.closeModal(); location.hash = '#/play'; App.render(); App.toast('Editing round. Tap any hole to change it, then save.');
+  },
+  cancelEdit() { if (!confirm('Discard your changes to this round?')) return; App.state.liveRound = null; Store.save(); location.hash = '#/rounds'; App.render(); },
   playHoles(el) { App.ui.playHoles = el.dataset.v; App.render(); },
   courseOpen(el) { const cs = App.ui.cs; const i = parseInt(el.dataset.i, 10); cs.open = cs.open === i ? null : i; App.render(); },
   importTee(el) {
@@ -335,6 +375,15 @@ function courseFromTee(c, t) {
 }
 
 Object.assign(Forms, {
+  editRound(form, v) {
+    const r = App.state.rounds.find(x => x.id === v.id); if (!r) return;
+    const slope = num(v.slope); if (!(slope >= 55 && slope <= 155)) { App.toast('Slope must be between 55 and 155'); return; }
+    Object.assign(r, { date: v.date, course: v.course.trim(), tees: v.tees.trim(), par: num(v.par, r.par), slope, score: num(v.score, r.score), notes: v.notes.trim() });
+    r.rating = r.holesPlayed === 9 ? Math.round(num(v.rating) / 2 * 10) / 10 : num(v.rating);
+    ['putts', 'firHit', 'firPossible', 'gir', 'penalties', 'udAtt', 'udMade', 'sandAtt', 'sandMade', 'threePutts', 'doubles'].forEach(k => { const n = parseFloat(v[k]); r[k] = isNaN(n) ? null : n; });
+    if (r.holesPlayed === 9) r.diff18 = nineHoleDifferential(r.score, r.rating, r.slope, r.indexUsed ?? App.index());
+    Store.save(); App.closeModal(); App.render(); App.toast('Round updated');
+  },
   courseSearch(form, v) {
     const q = (v.q || '').trim(); if (q.length < 3) return;
     const token = (App._csToken || 0) + 1; App._csToken = token;
@@ -349,6 +398,7 @@ Object.assign(Forms, {
 });
 
 Object.assign(Changes, {
+  liveNotes(el) { if (App.state.liveRound) { App.state.liveRound.notes = el.value; Store.save(); } },
   playCourse(el) { App.ui.playCourse = el.value || null; App.ui.playHoles = null; App.render(); },
   roundCourse(el) { App.ui.roundCourse = el.value || null; App.render(); },
 });
