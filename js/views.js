@@ -60,7 +60,7 @@ Views.dashboard = function () {
   const prev = hist.length > 5 ? hist[hist.length - 6].index : null;
   const trend = (idx != null && prev != null) ? idx - prev : null;
   const tier = App.tier();
-  const plan = weeklyPlan(tier.id, p.budget);
+  const plan = App.weekPlan().plan;
   const wk = isoWeekKey(new Date()); const checks = App.state.planChecks[wk] || {};
   const planned = plan.filter(d => d.session); const done = planned.filter(d => checks[d.day]).length;
   const analysis = strokeLossAnalysis(stAll, App.targetHcp());
@@ -295,7 +295,7 @@ Views.sessions = function () {
       <fieldset><legend>Drills done</legend>
         <div class="form-row"><div class="field"><label>Add a drill</label><select id="drillPicker">${DRILL_CATEGORIES.map(c => `<optgroup label="${c.label}">${drillsByCategory(c.id).map(d => `<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('')}</optgroup>`).join('')}</select></div>
         <div class="field"><label>&nbsp;</label><button type="button" class="btn" data-action="addSessionDrill">+ Add</button></div></div>
-        ${pending.length ? `<ul class="list compact mt">${pending.map((d, i) => `<li><div class="form-row" style="align-items:end"><div><strong>${escapeHtml(getDrill(d.id).name)}</strong><div class="tiny muted">${escapeHtml(getDrill(d.id).goal)}</div></div><div class="field"><label>Result / score</label><input name="result_${i}" value="${escapeHtml(d.result || '')}" placeholder="e.g. 14/20"></div><button type="button" class="btn sm ghost danger" data-action="removeSessionDrill" data-i="${i}">✕</button></div></li>`).join('')}</ul>` : '<p class="small muted mb0 mt">No drills added yet. Use the picker, or just log the time.</p>'}
+        ${pending.length ? `<ul class="list compact mt">${pending.map((d, i) => `<li><div class="form-row" style="align-items:end"><div><strong>${escapeHtml(getDrill(d.id).name)}</strong><div class="tiny muted">${escapeHtml(getDrill(d.id).goal)}</div></div>${drillScoreInput(d, i)}<button type="button" class="btn sm ghost danger" data-action="removeSessionDrill" data-i="${i}">✕</button></div></li>`).join('')}</ul>` : '<p class="small muted mb0 mt">No drills added yet. Use the picker, or just log the time.</p>'}
       </fieldset>
       <div class="field"><label>Notes</label><textarea name="notes" rows="2" placeholder="What clicked, what to work on next time…"></textarea></div>
       <button class="btn primary" type="submit">Save session</button>
@@ -305,6 +305,16 @@ Views.sessions = function () {
       ${total ? `<div class="table-wrap"><table><thead><tr><th>Area</th><th class="num">Minutes</th><th class="num">Share</th><th class="num">Target</th></tr></thead><tbody>${[['putting', 'Putting', tier.split.putting], ['shortgame', 'Short game', tier.split.shortgame], ['fullswing', 'Full swing', tier.split.fullswing], ['fitness', 'Fitness', tier.split.fitness], ['course', 'On course', null], ['mental', 'Mental', null]].map(([k, l, t]) => `<tr><td>${l}</td><td class="num">${byType[k] || 0}</td><td class="num">${pct(byType[k] || 0, total)}%</td><td class="num">${t != null ? t + '%' : '—'}</td></tr>`).join('')}</tbody></table></div>` : ''}
     </div></div>`;
 
+  const progress = [...new Set(sessions.flatMap(s => (s.drills || []).map(e => e.id)))].map(drillProgress).filter(pr => pr && pr.h.length >= 2)
+    .sort((a, b) => b.h[b.h.length - 1].date.localeCompare(a.h[a.h.length - 1].date));
+  if (progress.length) {
+    html += `<div class="card mt"><div class="card-head"><h2>Drill progress</h2><span class="small muted">${progress.length} drills with 2+ scores</span></div>
+      <div class="progress-list">${progress.slice(0, 12).map((pr, i) => `<button class="prog-row" data-action="openDrill" data-id="${pr.d.id}">
+        <span class="prog-name"><strong>${escapeHtml(pr.d.name)}</strong><span class="tiny muted">${pr.h.length} sessions · best ${pr.fmt(pr.best)}</span></span>
+        <canvas class="spark" id="spark${i}" aria-hidden="true"></canvas>
+        <span class="prog-val">${pr.fmt(pr.first)} → <strong>${pr.fmt(pr.last)}</strong> <span class="badge ${pr.improved ? 'good' : pr.change === 0 ? 'neutral' : 'warn'}">${pr.improved ? '▲' : pr.change === 0 ? '＝' : '▼'}</span></span></button>`).join('')}</div></div>`;
+    App.after(() => progress.slice(0, 12).forEach((pr, i) => { const c = document.getElementById('spark' + i); if (c) Charts.spark(c, pr.h.map(x => x.value), pr.m.better === 'lower'); }));
+  }
   html += `<div class="card mt"><div class="card-head"><h2>Session history</h2></div>
     ${sessions.length ? `<ul class="list">${sessions.slice(0, 40).map(s => `<li><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><strong>${fmtDate(s.date)}</strong> · ${SESSION_TYPES.find(t => t[0] === s.type)?.[1] || s.type} · ${s.minutes} min
       ${s.drills && s.drills.length ? `<div class="small">${s.drills.map(d => `${drillLink(d.id)}${d.result ? ` <span class="badge neutral">${escapeHtml(d.result)}</span>` : ''}`).join(' · ')}</div>` : ''}
@@ -346,7 +356,7 @@ Views.assessment = function () {
 /* ---------- Practice plan ---------- */
 Views.plan = function () {
   const p = App.state.profile; const tier = App.tier(); const budget = TIME_BUDGETS.find(b => b.id === p.budget) || TIME_BUDGETS[1];
-  const plan = weeklyPlan(tier.id, budget.id);
+  const adapted = App.weekPlan(); const plan = adapted.plan;
   const wk = App.ui.planWeek || isoWeekKey(new Date()); const checks = App.state.planChecks[wk] || {};
   const totalMin = plan.reduce((a, d) => a + (d.session ? d.session.minutes : 0), 0);
   const prog = App.programWeek();
@@ -358,10 +368,14 @@ Views.plan = function () {
     <div class="field"><label>Week</label><div class="btn-row"><button class="btn sm" data-action="planWeek" data-dir="-1">‹</button><strong class="mono">${wk}</strong><button class="btn sm" data-action="planWeek" data-dir="1">›</button><button class="btn sm ghost" data-action="planWeek" data-dir="0">today</button></div></div>
   </div>
   <div class="callout mt"><strong>${tier.label} focus:</strong> ${tier.focus}</div>
+  <div class="adapt-box ${adapted.focus.length ? 'on' : ''}"><label class="field inline"><input type="checkbox" data-change="adaptive" ${p.adaptive === false ? '' : 'checked'}> Adapt my plan to my weaknesses</label>
+    ${p.adaptive === false ? '<p class="tiny muted mb0">Off: you get the standard plan for your level.</p>'
+      : adapted.focus.length ? `<p class="small mb0">This week leans toward <strong>${adapted.focus.map(f => escapeHtml(f.label) + (f.loss != null ? ` (≈${fmt1(f.loss)} strokes)` : '')).join('</strong> and <strong>')}</strong> ${adapted.focus[0].source === 'stats' ? 'from your last 10 rounds' : 'from your latest Skills Test'}. ${adapted.swaps} drill${adapted.swaps === 1 ? '' : 's'} swapped in, marked <span class="focus-tag">Focus</span>.</p>`
+      : '<p class="tiny muted mb0">Log rounds with stats or run the Skills Test and the plan will shift toward where you lose the most strokes.</p>'}</div>
   <p class="small muted mb0">${plan.filter(d => d.session).length} sessions · ${Math.round(totalMin / 60 * 10) / 10} hours this week · ${plan.filter(d => d.session && checks[d.day]).length} done</p></div>`;
 
   html += `<div class="week mt">${plan.map(d => d.session ? `<div class="day ${checks[d.day] ? 'done' : ''}"><div class="dname">${d.day}</div><div class="dtitle">${escapeHtml(d.session.name)}</div><div class="dmin">${d.session.minutes} min · ${escapeHtml(d.session.type)}</div>
-    <ul>${d.session.drills.map(([id, m]) => `<li>${drillLink(id)} <span class="muted">${m}′</span></li>`).join('')}</ul>
+    <ul>${d.session.drills.map(([id, m, why]) => `<li>${drillLink(id)} <span class="muted">${m}′</span>${why ? ` <span class="focus-tag" title="Swapped in for ${escapeHtml(why)}">Focus</span>` : ''}</li>`).join('')}</ul>
     <label><input type="checkbox" data-change="planCheck" data-week="${wk}" data-day="${d.day}" ${checks[d.day] ? 'checked' : ''}> Done</label></div>`
     : `<div class="day rest"><div class="dname">${d.day}</div><div class="dtitle">Rest</div><div class="dmin">Mobility, a walk, or 10 minutes of putting on the carpet.</div></div>`).join('')}</div>`;
 
@@ -390,6 +404,32 @@ Views.drills = function () {
   return html;
 };
 
+/* Score input for a drill in the session form: a number (with "/ N" or unit) when the drill has one, text otherwise. */
+function drillScoreInput(d, i) {
+  const m = drillMetric(getDrill(d.id));
+  if (m.kind === 'none') return `<div class="field"><label>Result / notes</label><input name="result_${i}" value="${escapeHtml(d.result || '')}" placeholder="e.g. felt solid"></div>`;
+  const hint = m.outOf ? `/ ${m.outOf}` : m.kind === 'score' ? (m.par ? `par ${m.par}` : 'vs par') : m.unit;
+  return `<div class="field"><label>Score${m.target != null ? ` <span class="muted">(target ${m.better === 'lower' ? '≤' : '≥'} ${m.target})</span>` : ''}</label><div class="score-input"><input type="number" step="any" inputmode="decimal" name="value_${i}" value="${d.value != null ? d.value : ''}" ${m.outOf ? `min="0" max="${m.outOf}"` : ''}><span>${escapeHtml(hint)}</span></div></div>`;
+}
+
+/* Is this value better than every earlier score for the drill? */
+function isPersonalBest(id, value) {
+  // called before the new session is stored, so the history holds only earlier scores
+  const m = drillMetric(getDrill(id)); const prev = drillHistory(App.state.sessions, id).map(x => x.value);
+  if (!prev.length) return false;
+  return m.better === 'lower' ? value < Math.min(...prev) : value > Math.max(...prev);
+}
+
+/* Progress summary for the drill modal and practice log. */
+function drillProgress(id) {
+  const d = getDrill(id); const m = drillMetric(d); const h = drillHistory(App.state.sessions, id);
+  if (m.kind === 'none' || !h.length) return null;
+  const vals = h.map(x => x.value); const first = vals[0], last = vals[vals.length - 1];
+  const best = m.better === 'lower' ? Math.min(...vals) : Math.max(...vals);
+  const change = last - first; const improved = m.better === 'lower' ? change < 0 : change > 0;
+  return { d, m, h, first, last, best, change, improved, fmt: v => m.outOf ? `${v}/${m.outOf}` : `${v}${m.unit && m.unit !== 'vs par' ? ' ' + m.unit : ''}` };
+}
+
 function drillModal(d) {
   const fav = App.state.favorites.includes(d.id);
   return `<div class="drill-detail"><span class="tag ${d.category}">${categoryLabel(d.category)}</span><h2 class="mt">${escapeHtml(d.name)}</h2>
@@ -399,6 +439,8 @@ function drillModal(d) {
     <h3>Steps</h3><ol>${d.steps.map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ol>
     <div class="callout"><strong>Goal / score:</strong> ${escapeHtml(d.goal)}</div>
     <div class="callout info"><strong>Pro tip:</strong> ${escapeHtml(d.proTip)}</div>
+    ${(() => { const pr = drillProgress(d.id); if (!pr) return ''; App.after(() => { const c = document.getElementById('drillHistChart'); if (c) Charts.line(c, pr.h.map(x => fmtDate(x.date)), [{ label: 'Score', values: pr.h.map(x => x.value) }], { target: pr.m.target != null ? pr.m.target : undefined, invert: pr.m.better === 'lower' }); });
+      return `<h3 class="mt">Your progress</h3><div class="stat-row mb">${statBox('Latest', pr.fmt(pr.last))}${statBox('Best', pr.fmt(pr.best))}${statBox('Sessions', pr.h.length)}${pr.h.length > 1 ? statBox('Change', (pr.change > 0 ? '+' : '') + Math.round(pr.change * 10) / 10, pr.improved ? 'improving' : pr.change === 0 ? 'steady' : 'slipped') : ''}</div>${pr.h.length > 1 ? '<canvas class="chart" id="drillHistChart"></canvas>' : '<p class="small muted">Log this drill again to see a trend.</p>'}`; })()}
     <div class="btn-row mt"><button class="btn primary" data-action="timerFor" data-min="${d.minutes}" data-name="${escapeHtml(d.name)}">Start ${d.minutes}-min timer</button><button class="btn" data-action="logDrill" data-id="${d.id}">Log this drill</button><button class="btn ${fav ? 'primary' : ''}" data-action="toggleFav" data-id="${d.id}">${fav ? '★ Favourited' : '☆ Favourite'}</button></div></div>`;
 }
 

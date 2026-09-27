@@ -50,6 +50,23 @@ const App = {
     const rs = this.rounds().filter(r => r.diff != null).slice(0, 20); const rule = whsRule(rs.length); if (!rule) return [];
     return rs.slice().sort((a, b) => a.diff - b.diff).slice(0, rule.use).map(r => r.id);
   },
+  /* Focus areas for the plan: the biggest stroke-loss areas, or the weakest Skills Test areas when there are no round stats. */
+  focusAreas() {
+    const st = roundStats(this.rounds(), 10);
+    const areas = strokeLossAnalysis(st, this.targetHcp()).filter(a => a.loss >= 0.5).slice(0, 2);
+    if (areas.length) return areas.map(a => ({ key: a.key, label: a.label, loss: a.loss, source: 'stats' }));
+    const tests = this.state.assessments.slice().sort((a, b) => b.date.localeCompare(a.date)); if (!tests.length) return [];
+    const toKey = { putting: 'putting', chipping: 'scrambling', pitching: 'scrambling', bunker: 'scrambling', wedges: 'approach', irons: 'approach', driver: 'driving' };
+    const tier = this.tier(); const seen = new Set();
+    return ASSESSMENT_TESTS.map(t => ({ t, gap: tests[0].results[t.id] - t.benchmarks[tier.id] })).filter(x => x.gap < 0).sort((a, b) => a.gap - b.gap)
+      .map(x => ({ key: toKey[x.t.area], label: x.t.name, loss: null, source: 'test' })).filter(f => f.key && !seen.has(f.key) && seen.add(f.key)).slice(0, 2);
+  },
+  /* This week's plan for the player's tier and time budget, adapted to their focus areas unless switched off. */
+  weekPlan() {
+    const base = weeklyPlan(this.tier().id, this.state.profile.budget);
+    if (this.state.profile.adaptive === false) return { plan: base, focus: [], swaps: 0 };
+    return adaptPlan(base, this.focusAreas(), this.tier().id);
+  },
   tier() { const o = this.state.profile.tierOverride; return (o && TIERS.find(t => t.id === o)) || tierForIndex(this.index()); },
   targetHcp() {
     const p = this.state.profile; const idx = this.index();
@@ -156,7 +173,7 @@ const App = {
 const Actions = {
   closeModal() { App.closeModal(); },
   goto(el) { App.closeModal(); location.hash = el.dataset.href; },
-  startTodaySession(el) { const s = getSessionTemplate(App.tier().id, el.dataset.sid); if (!s) return; App.ui.sessionDrills = s.drills.map(([id]) => ({ id, result: '' })); App.ui.sessionType = s.type; location.hash = '#/sessions'; App.toast(s.name + ': drills loaded. Log scores as you go.'); },
+  startTodaySession(el) { const day = App.weekPlan().plan.find(d => d.session && d.session.id === el.dataset.sid); const s = day && day.session; if (!s) return; App.ui.sessionDrills = s.drills.map(([id]) => ({ id, result: '' })); App.ui.sessionType = s.type; location.hash = '#/sessions'; App.toast(s.name + ': drills loaded. Log scores as you go.'); },
   openDrill(el) { const d = getDrill(el.dataset.id); if (d) App.modal(drillModal(d)); },
   toggleFav(el) { const f = App.state.favorites; const i = f.indexOf(el.dataset.id); i >= 0 ? f.splice(i, 1) : f.push(el.dataset.id); Store.save(); if (document.getElementById('modalHost')) Actions.openDrill(el); App.render(); },
   timerFor(el) { App.timerSet(parseInt(el.dataset.min, 10), el.dataset.name); App.closeModal(); location.hash = '#/tools'; App.timerToggle(); },
@@ -167,7 +184,13 @@ const Actions = {
   logDrill(el) { App.ui.sessionDrills = App.ui.sessionDrills || []; App.ui.sessionDrills.push({ id: el.dataset.id, result: '' }); App.closeModal(); location.hash = '#/sessions'; App.render(); App.toast('Drill added to the session form'); },
   addSessionDrill() { const id = document.getElementById('drillPicker').value; App.ui.sessionDrills = App.ui.sessionDrills || []; Actions._captureResults(); App.ui.sessionDrills.push({ id, result: '' }); App.render(); },
   removeSessionDrill(el) { Actions._captureResults(); App.ui.sessionDrills.splice(parseInt(el.dataset.i, 10), 1); App.render(); },
-  _captureResults() { (App.ui.sessionDrills || []).forEach((d, i) => { const inp = document.querySelector(`[name="result_${i}"]`); if (inp) d.result = inp.value; }); },
+  _captureResults() {
+    (App.ui.sessionDrills || []).forEach((d, i) => {
+      const val = document.querySelector(`[name="value_${i}"]`), txt = document.querySelector(`[name="result_${i}"]`);
+      if (val) { const n = parseFloat(val.value); d.value = isNaN(n) ? null : n; }
+      if (txt) d.result = txt.value;
+    });
+  },
   deleteRound(el) { if (!confirm('Delete this round?')) return; App.state.rounds = App.state.rounds.filter(r => r.id !== el.dataset.id); Store.save(); App.render(); },
   deleteSession(el) { if (!confirm('Delete this session?')) return; App.state.sessions = App.state.sessions.filter(r => r.id !== el.dataset.id); Store.save(); App.render(); },
   deleteAssessment(el) { if (!confirm('Delete this test?')) return; App.state.assessments = App.state.assessments.filter(r => r.id !== el.dataset.id); Store.save(); App.render(); },
@@ -217,9 +240,14 @@ const Forms = {
   },
   session(form, v) {
     Actions._captureResults();
-    const s = { id: uid(), date: v.date, minutes: num(v.minutes, 0), type: v.type, notes: v.notes.trim(), drills: (App.ui.sessionDrills || []).map(d => ({ id: d.id, result: d.result })) };
+    const s = { id: uid(), date: v.date, minutes: num(v.minutes, 0), type: v.type, notes: v.notes.trim(), drills: (App.ui.sessionDrills || []).map(d => {
+      const m = drillMetric(getDrill(d.id)); const e = { id: d.id, result: (d.result || '').trim() };
+      if (d.value != null) { e.value = d.value; e.result = m.outOf ? `${d.value}/${m.outOf}` : `${d.value}${m.unit ? ' ' + m.unit : ''}`; }
+      return e;
+    }) };
+    const pbs = s.drills.filter(e => e.value != null && isPersonalBest(e.id, e.value)).map(e => getDrill(e.id).name);
     const before = unlockedIds();
-    App.state.sessions.push(s); App.ui.sessionDrills = []; App.ui.sessionType = null; Store.save(); App.render(); App.toast('Session saved. Nice work.'); announceAchievements(before);
+    App.state.sessions.push(s); App.ui.sessionDrills = []; App.ui.sessionType = null; Store.save(); App.render(); App.toast('Session saved. Nice work.'); pbs.forEach((n, i) => setTimeout(() => App.toast('🏅 Personal best: ' + n), 500 + i * 900)); announceAchievements(before);
   },
   assessment(form, v) {
     const results = {}; ASSESSMENT_TESTS.forEach(t => { results[t.id] = Math.max(0, Math.min(10, num(v[t.id], 0))); });
@@ -254,6 +282,7 @@ const Forms = {
 /* ---------- change handlers ---------- */
 const Changes = {
   planCheck(el) { const wk = el.dataset.week; App.state.planChecks[wk] = App.state.planChecks[wk] || {}; App.state.planChecks[wk][el.dataset.day] = el.checked; Store.save(); App.render(); },
+  adaptive(el) { App.state.profile.adaptive = el.checked; Store.save(); App.render(); },
   tierOverride(el) { App.state.profile.tierOverride = el.value; Store.save(); App.render(); },
   budget(el) { App.state.profile.budget = el.value; Store.save(); App.render(); },
   routineStep(el) { App.state.routine[parseInt(el.dataset.i, 10)] = el.value; Store.save(); },
@@ -280,6 +309,10 @@ function loadDemoData() {
   rows.forEach(([ago, score, putts, fir, gir, pen, tp, dbl, udA, udM], i) => s.rounds.push({ id: uid() + i, date: d(ago), course: i % 3 === 0 ? 'Riverside GC' : 'Home course', tees: 'White', par: 72, rating: 71.4, slope: 128, score, putts, firHit: fir, firPossible: 14, gir, penalties: pen, udAtt: udA, udMade: udM, sandAtt: 2, sandMade: i % 2, threePutts: tp, doubles: dbl, notes: i === 11 ? 'Best round of the year. Centre of green all day.' : '' }));
   [[2, 45, 'putting', [['ladder-lag', '15/20'], ['clock-drill', '4 ft']]], [4, 60, 'fullswing', [['towel-behind-ball', '17/20'], ['fairway-gate', '6/10']]], [6, 40, 'shortgame', [['towel-landing', '16/30'], ['up-and-down-10', '4/10']]], [9, 30, 'fitness', [['golf-strength-circuit', '']]], [11, 45, 'putting', [['3-6-9', '9 min']]], [13, 120, 'course', [['centre-of-green', '9 GIR']]], [16, 45, 'shortgame', [['dollar-bill', '8/10']]], [18, 60, 'fullswing', [['three-club-distance', '9/15']]], [20, 40, 'putting', [['par-18-putting', '21']]], [23, 35, 'fitness', [['med-ball-throws', '']]]]
     .forEach(([ago, minutes, type, drills], i) => s.sessions.push({ id: uid() + 's' + i, date: d(ago), minutes, type, notes: '', drills: drills.map(([id, result]) => ({ id, result })) }));
+  // Earlier sessions repeating a few drills, so drill progress has trends to show.
+  [[30, 'putting', [['ladder-lag', 11], ['par-18-putting', 24]]], [27, 'shortgame', [['towel-landing', 11], ['up-and-down-10', 2]]], [25, 'putting', [['ladder-lag', 13], ['par-18-putting', 23]]],
+   [21, 'shortgame', [['towel-landing', 13], ['up-and-down-10', 3]]], [19, 'fullswing', [['fairway-gate', 4], ['towel-behind-ball', 14]]], [12, 'fullswing', [['fairway-gate', 5], ['towel-behind-ball', 15]]]]
+    .forEach(([ago, type, drills], i) => s.sessions.push({ id: uid() + 'p' + i, date: d(ago), minutes: 40, type, notes: '', drills: drills.map(([id, value]) => { const m = drillMetric(getDrill(id)); return { id, value, result: m.outOf ? value + '/' + m.outOf : String(value) }; }) }));
   // The four most recent demo rounds get hole-by-hole cards so the scoring breakdown has data.
   s.rounds.slice(-4).forEach((r, n) => {
     const over = r.score - 72; const holes = DEFAULT_PARS.map(() => ({ strokes: 0, putts: 2, fir: null, pen: 0, sand: false }));

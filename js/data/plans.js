@@ -116,3 +116,42 @@ function weeklyPlan(tierId, budgetId) {
   const layout = (WEEKLY_LAYOUT[tierId] || WEEKLY_LAYOUT.improver)[budgetId] || WEEKLY_LAYOUT.improver.standard;
   return layout.map((sid, i) => ({ day: DAYS[i], session: sid ? getSessionTemplate(tierId, sid) : null }));
 }
+
+/* ---------- Adaptive plan ---------- */
+/* For each stroke-loss area: the drill categories that fix it, and the session types it can be slotted into. */
+const AREA_FOCUS = {
+  putting:    { cats: ['putting'], sessions: ['putting'] },
+  lag:        { cats: ['putting'], sessions: ['putting'] },
+  scrambling: { cats: ['chipping', 'pitching', 'bunker'], sessions: ['shortgame'] },
+  approach:   { cats: ['irons', 'wedges', 'pitching'], sessions: ['fullswing'] },
+  driving:    { cats: ['driver'], sessions: ['fullswing'] },
+  penalties:  { cats: ['course', 'driver'], sessions: ['fullswing'] },
+  blowups:    { cats: ['course', 'mental'], sessions: ['shortgame', 'fullswing'] },
+};
+/* Drills that are part of a session's structure (warm-up, closing pressure putt) and never swapped out. */
+const FIXED_DRILLS = ['dynamic-warmup', 'pressure-putt'];
+
+/* Re-point the weekly plan at the player's weakest areas. focus: [{key, label, loss}] (worst first).
+   Each practice session of a matching type gets one drill swapped for a focus drill the week doesn't
+   already contain; the swapped-out drill is one outside the focus categories. Returns {plan, focus, swaps}. */
+function adaptPlan(plan, focus, tierId) {
+  const maxDiff = { beginner: 2, improver: 2, intermediate: 3, advanced: 3 }[tierId] || 3;
+  const used = new Set(plan.flatMap(d => d.session ? d.session.drills.map(([id]) => id) : []));
+  const specs = focus.map(f => AREA_FOCUS[f.key]).map(a => a && { ...a, pool: DRILLS.filter(dr => a.cats.includes(dr.category) && dr.difficulty <= maxDiff && dr.minutes <= 30) });
+  let swaps = 0;
+  const out = plan.map(day => {
+    if (!day.session) return day;
+    const drills = day.session.drills.map(x => x.slice()); let swapped = false;
+    focus.forEach((f, fi) => {
+      const spec = specs[fi]; if (swapped || !spec || !spec.sessions.includes(day.session.type)) return;
+      // replace the last swappable drill that is not already working on this area
+      let slot = -1;
+      drills.forEach(([id], k) => { if (!FIXED_DRILLS.includes(id) && !spec.cats.includes((getDrill(id) || {}).category)) slot = k; });
+      const pick = spec.pool.find(dr => !used.has(dr.id));
+      if (slot < 0 || !pick) return;
+      used.add(pick.id); drills[slot] = [pick.id, drills[slot][1], f.label]; swapped = true; swaps++;
+    });
+    return swapped ? { ...day, session: { ...day.session, drills } } : day;
+  });
+  return { plan: out, focus, swaps };
+}

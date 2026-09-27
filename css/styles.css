@@ -529,6 +529,21 @@ table.scorecard thead th:last-child { border-radius: 0 8px 0 0; background: var(
 .seg-opt input:checked + span { background: var(--surface); color: var(--accent); box-shadow: var(--shadow); }
 .seg-opt input:focus-visible + span { outline: 2px solid var(--ring); }
 
+.score-input { display: flex; align-items: center; gap: 8px; }
+.score-input input { width: 90px; flex: none; }
+.score-input span { color: var(--text-muted); font-weight: 600; font-size: .88rem; }
+.progress-list { display: grid; gap: 4px; }
+.prog-row { display: grid; grid-template-columns: minmax(0, 1.4fr) 110px minmax(0, 1fr); align-items: center; gap: 14px; padding: 10px 12px; border-radius: 10px; border: 0; background: none; font: inherit; color: var(--text); text-align: left; cursor: pointer; }
+.prog-row:hover { background: var(--surface-2); }
+.prog-name { display: flex; flex-direction: column; min-width: 0; }
+.prog-val { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+canvas.spark { width: 110px; height: 30px; display: block; }
+@media (max-width: 600px) { .prog-row { grid-template-columns: minmax(0, 1fr) 70px; } .prog-row .prog-val { grid-column: 1 / -1; text-align: left; } canvas.spark { width: 70px; } }
+
+.adapt-box { margin: 4px 0 12px; padding: 12px 14px; border-radius: var(--radius-sm); border: 1px dashed var(--border-strong); }
+.adapt-box.on { border-style: solid; border-color: color-mix(in srgb, var(--gold) 45%, var(--border)); background: var(--gold-soft); }
+.focus-tag { display: inline-block; padding: 0 6px; border-radius: 5px; font-size: .64rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; background: var(--gold); color: #fff; vertical-align: 1px; }
+
 /* ---------- Course search ---------- */
 .search-row { display: flex; gap: 8px; }
 .search-row input { flex: 1; min-width: 0; font: inherit; padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); min-height: 44px; }

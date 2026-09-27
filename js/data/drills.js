@@ -720,3 +720,38 @@ const DRILLS = [
 function getDrill(id) { return DRILLS.find(d => d.id === id); }
 function drillsByCategory(cat) { return DRILLS.filter(d => d.category === cat); }
 function categoryLabel(id) { const c = DRILL_CATEGORIES.find(c => c.id === id); return c ? c.label : id; }
+
+/* How a drill is scored, inferred from its goal text: {kind, outOf, unit, better: 'higher'|'lower', target}.
+   kind 'none' means the drill has no single number to track. */
+const _metricCache = {};
+function drillMetric(d) {
+  if (!d) return { kind: 'none' };
+  if (_metricCache[d.id]) return _metricCache[d.id];
+  const g = d.goal; let m;
+  const target = (re) => { const t = re.exec(g); return t ? parseFloat(t[1]) : null; };
+  if ((m = /out of (\d+)/i.exec(g))) m = { kind: 'count', outOf: +m[1], unit: '', better: 'higher', target: target(/Target (\d+)\+?/i) };
+  else if (/vs par (\d+)/i.test(g)) { const par = +/vs par (\d+)/i.exec(g)[1]; m = { kind: 'score', unit: 'strokes', better: 'lower', par, target: target(/Target:? (\d+)/i) ?? target(/\((\d+)\)/) }; }
+  else if (/score vs par/i.test(g)) m = { kind: 'score', unit: 'vs par', better: 'lower', target: null };
+  else if (/time how long|minutes/i.test(g)) m = { kind: 'value', unit: 'min', better: 'lower', target: target(/under (\d+) minutes/i) };
+  else if (/spread/i.test(g)) m = { kind: 'value', unit: 'sec', better: 'lower', target: target(/under (\d+) seconds/i) };
+  else if (/seconds/i.test(g)) m = { kind: 'value', unit: 'sec', better: 'higher', target: target(/Target (\d+)/i) };
+  else if (/in a row|streak/i.test(g)) m = { kind: 'value', unit: 'in a row', better: 'higher', target: target(/Target (\d+)/i) };
+  else if (/longest distance/i.test(g)) m = { kind: 'value', unit: 'ft', better: 'higher', target: target(/Advanced: (\d+)/i) };
+  else if (/percentage|make rate/i.test(g)) m = { kind: 'value', unit: '%', better: 'higher', target: target(/Target (\d+)%/i) };
+  else if (/per round/i.test(g)) m = { kind: 'value', unit: '', better: 'lower', target: null };
+  else m = { kind: 'none' };
+  return (_metricCache[d.id] = m);
+}
+
+/* Numeric value of a logged drill entry ({result, value}), accepting older free-text results like "14/20". */
+function drillEntryValue(e) {
+  if (e.value != null && !isNaN(e.value)) return +e.value;
+  const m = /(-?\d+(?:\.\d+)?)/.exec(e.result || ''); return m ? parseFloat(m[1]) : null;
+}
+
+/* Scored history for one drill across sessions, oldest first: [{date, value}]. */
+function drillHistory(sessions, id) {
+  const out = [];
+  sessions.forEach(s => (s.drills || []).forEach(e => { if (e.id !== id) return; const v = drillEntryValue(e); if (v != null) out.push({ date: s.date, value: v }); }));
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}

@@ -3,7 +3,7 @@ const Charts = {
   _prep(canvas) {
     const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
-    const w = Math.max(200, rect.width), h = Math.max(120, rect.height);
+    const w = Math.max(canvas.classList.contains('spark') ? 40 : 200, rect.width), h = Math.max(canvas.classList.contains('spark') ? 20 : 120, rect.height);
     canvas.width = w * dpr; canvas.height = h * dpr;
     const ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr);
     const css = getComputedStyle(document.documentElement);
@@ -71,6 +71,17 @@ const Charts = {
       ctx.font = '500 11px Inter, system-ui, sans-serif'; let lx = padL + 4;
       series.forEach(s => { const col = colors[s.color] || s.color || colors.accent; ctx.fillStyle = col; ctx.fillRect(lx, padT - 10, 10, 3); ctx.fillStyle = colors.text; ctx.textAlign = 'left'; ctx.fillText(s.label, lx + 14, padT - 5); lx += 14 + ctx.measureText(s.label).width + 14; });
     }
+  },
+  /* Tiny trend line; the end dot is green when the trend is good, amber when not. */
+  spark(canvas, values, lowerIsBetter) {
+    const { ctx, w, h, colors } = this._prep(canvas);
+    if (values.length < 2) return;
+    let min = Math.min(...values), max = Math.max(...values); if (max === min) { min -= 1; max += 1; }
+    const x = i => 3 + (i / (values.length - 1)) * (w - 6), y = v => 3 + (1 - (v - min) / (max - min)) * (h - 6);
+    const good = lowerIsBetter ? values[values.length - 1] <= values[0] : values[values.length - 1] >= values[0];
+    ctx.strokeStyle = colors.accent; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.beginPath();
+    values.forEach((v, i) => i ? ctx.lineTo(x(i), y(v)) : ctx.moveTo(x(i), y(v))); ctx.stroke();
+    ctx.fillStyle = good ? colors.accent : colors.gold; ctx.beginPath(); ctx.arc(x(values.length - 1), y(values[values.length - 1]), 3.5, 0, Math.PI * 2); ctx.fill();
   },
   /* bars: [{label, value, color}] */
   bar(canvas, bars, opts) {
