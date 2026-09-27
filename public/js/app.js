@@ -299,6 +299,34 @@ const Forms = {
     Store.save(); App.closeModal(); App.render();
     App.toast(p.startIndex != null ? `Welcome${p.name ? ', ' + p.name : ''}! Starting at ${fmt1(p.startIndex)}.` : 'Welcome! Log 3 rounds to get your index.');
   },
+  /* Download an .ics calendar with the weekly plan, repeating weekly, each with a 30-minute alert. */
+  calendar(form, v) {
+    const p = App.state.profile; p.reminders = { time: v.time || '18:00', weeks: parseInt(v.weeks, 10) || 8 }; Store.save();
+    const [hh, mm] = p.reminders.time.split(':').map(Number);
+    const pad = n => String(n).padStart(2, '0');
+    const stamp = d => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
+    const esc = s => String(s).replace(/\\/g, '\\\\').replace(/[,;]/g, m => '\\' + m).replace(/\n/g, '\\n');
+    const now = new Date(); const utc = now.toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+    const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Fairway Lab//Practice Plan//EN', 'CALSCALE:GREGORIAN', 'X-WR-CALNAME:Fairway Lab practice'];
+    App.weekPlan().plan.forEach((d, i) => {
+      if (!d.session) return;
+      const start = new Date(now); start.setHours(hh, mm, 0, 0);
+      const offset = (i - ((now.getDay() + 6) % 7) + 7) % 7; start.setDate(start.getDate() + offset);
+      if (start < now) start.setDate(start.getDate() + 7);
+      const end = new Date(start.getTime() + d.session.minutes * 60000);
+      const drills = d.session.drills.map(([id, m]) => `• ${(getDrill(id) || { name: id }).name} (${m} min)`).join('\n');
+      lines.push('BEGIN:VEVENT', `UID:fairwaylab-${d.session.id}-${i}@fairwaylab`, `DTSTAMP:${utc}`, `DTSTART:${stamp(start)}`, `DTEND:${stamp(end)}`,
+        `RRULE:FREQ=WEEKLY;COUNT=${p.reminders.weeks}`, `SUMMARY:${esc('⛳ ' + d.session.name)}`, `DESCRIPTION:${esc(drills + '\n\nLog your scores in Fairway Lab.')}`,
+        'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${esc(d.session.name + ' in 30 minutes')}`, 'TRIGGER:-PT30M', 'END:VALARM', 'END:VEVENT');
+    });
+    lines.push('END:VCALENDAR');
+    // RFC 5545: fold long lines (kept well under 75 octets since the text includes multi-byte characters)
+    const fold = l => { const out = []; while (l.length > 60) { out.push(l.slice(0, 60)); l = ' ' + l.slice(60); } out.push(l); return out.join('\r\n'); };
+    const blob = new Blob([lines.map(fold).join('\r\n') + '\r\n'], { type: 'text/calendar' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'fairway-lab-practice.ics'; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    App.toast('Calendar file ready: open it to add your sessions');
+  },
   clubQuery(form, v) {
     const dist = num(v.dist, 150), wind = num(v.wind, 0), elev = num(v.elev, 0), cond = num(v.cond, 0);
     let plays = dist + wind * 1.0 + elev * 1.0 + cond * 8;   // ≈ 1 yd per mph wind, 1 yd per yd elevation, cold ≈ +8

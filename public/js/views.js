@@ -379,6 +379,15 @@ Views.plan = function () {
     <label><input type="checkbox" data-change="planCheck" data-week="${wk}" data-day="${d.day}" ${checks[d.day] ? 'checked' : ''}> Done</label></div>`
     : `<div class="day rest"><div class="dname">${d.day}</div><div class="dtitle">Rest</div><div class="dmin">Mobility, a walk, or 10 minutes of putting on the carpet.</div></div>`).join('')}</div>`;
 
+  const rem = p.reminders || { time: '18:00', weeks: 8 };
+  html += `<div class="card mt"><div class="card-head"><h2>Practice reminders</h2><span class="tag">Calendar</span></div>
+    <p class="small muted">Put this schedule in your phone's calendar with an alert 30 minutes before each session. Works with Apple, Google and Outlook calendars.</p>
+    <form class="form-row" data-form="calendar" style="align-items:end">
+      <div class="field"><label>Session time</label><input type="time" name="time" value="${escapeHtml(rem.time)}" required></div>
+      <div class="field"><label>For the next</label><select name="weeks">${[4, 8, 12].map(w => `<option value="${w}" ${rem.weeks == w ? 'selected' : ''}>${w} weeks</option>`).join('')}</select></div>
+      <div class="field"><button class="btn primary" type="submit">📅 Add to my calendar</button></div>
+    </form>
+    <p class="tiny muted mt mb0">Your plan adapts as your stats change, so re-add it every month or two to keep the drills current.</p></div>`;
   html += `<div class="card mt"><div class="card-head"><h2>12-week program</h2>${prog ? `<button class="btn sm ghost danger" data-action="resetProgram">Reset</button>` : `<button class="btn primary sm" data-action="startProgram">Start today</button>`}</div>
     ${prog ? `<p><strong>Week ${prog.week} of 12</strong> · started ${fmtDate(App.state.programStart)} · <strong>${escapeHtml(PROGRAM.weekThemes[prog.week])}</strong></p><div class="phase-bar">${[...Array(12)].map((_, i) => `<span class="${i < 4 ? 'p1' : i < 8 ? 'p2' : 'p3'} ${i + 1 === prog.week ? 'current' : ''}" title="Week ${i + 1}"></span>`).join('')}</div>` : '<p class="muted">Three 4-week phases. Start it and the dashboard tracks your week and theme.</p>'}
     <div class="grid grid-3 mt">${PROGRAM.phases.map(ph => `<div class="card tight ${prog && ph.weeks.includes(prog.week) ? '' : ''}" style="${prog && ph.weeks.includes(prog.week) ? 'border-color:var(--accent)' : ''}"><h3>${escapeHtml(ph.name)}</h3><p class="small muted">${escapeHtml(ph.goal)}</p><ul class="small" style="padding-left:1.1rem;margin:0">${ph.keys.map(k => `<li>${escapeHtml(k)}</li>`).join('')}</ul><div class="mt small">${ph.weeks.map(w => `<div><strong>Wk ${w}:</strong> ${escapeHtml(PROGRAM.weekThemes[w])}</div>`).join('')}</div></div>`).join('')}</div>
