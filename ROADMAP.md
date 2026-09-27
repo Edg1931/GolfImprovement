@@ -30,13 +30,29 @@ This review compares Fairway Lab with the leading golf apps: Arccos, Shot Scope,
 
 It also fixes bugs from the first version. Every tap re-rendered the page and jumped back to the top. On phones, wide tables overflowed the layout. Charts now redraw once the web font has loaded.
 
+## Added since: the full improvement list
+
+| Feature | Notes |
+| --- | --- |
+| **Accounts and cloud sync** | Supabase email sign-in. The whole app state syncs per user and merges between devices, with deletions tracked. Works offline and syncs when back online. |
+| **Edit saved rounds** | Hole-by-hole rounds reopen in the scorecard; quick-logged rounds get an edit form; notes on the live card. |
+| **Day-one onboarding** | Enter your current handicap, target and practice time on first launch. The starting index is used until 3 scores exist. |
+| **Drill progress** | Drills are scored as numbers (for example "14/20", "21 strokes"), with trend charts, personal-best alerts and a progress list. |
+| **Adaptive weekly plan** | The plan swaps drills toward your two biggest stroke-loss areas (or your weakest Skills Test areas). It can be switched off. |
+| **AI round debrief** | Claude writes a short coaching summary for signed-in users, capped at 10 a day per person. |
+| **WHS caps** | Soft and hard caps against the Low Handicap Index once 20 scores exist. |
+| **Green yardages** | Save the front, middle and back of each green once per course with GPS; live distances as you walk. |
+| **Club per shot** | GPS shots are tagged with a club, and My Clubs shows your real on-course distances. |
+| **Share cards** | Round and achievement images for the phone's share sheet. |
+| **Practice reminders** | Add the weekly plan to any calendar app with 30-minute alerts. |
+| **Friends and leaderboards** | Two-way friend codes; weekly practice, handicap, best score and rounds played. |
+| **Automated tests** | API and browser tests on desktop and phone sizes, run by GitHub Actions on every push. |
+
 ## Recommended next features (by impact)
 
-1. **Accounts and cloud sync** (Supabase). Rounds survive a lost phone and sync between phone and laptop. This is the biggest gap against every competitor.
-2. **Green front/centre/back yardages** on a satellite map (Hole19, 18Birdies). This needs course geometry: use OpenStreetMap golf features where they exist, or let players drop pins once per course.
-3. **Shot-level tracking**: club and distance per shot, turning the GPS measure into a real shot map and true strokes-gained (Arccos, Shot Scope).
-4. **AI caddie / coach summary** after each round: a plain-English "what cost you strokes today and what to practise this week" (18Birdies AI caddie, Clippd insights).
-5. **Friends and leaderboards**: share a round card image, weekly practice-minutes leaderboard (18Birdies, Garmin).
-6. **Apple Watch / Wear OS companion** for the scorecard (Hole19, Garmin).
-7. **Swing video capture** with a side-by-side and a drawing tool (V1 Golf). This is heavier and best linked out to at first.
-8. **Reminders**: push notifications for scheduled practice sessions (these need the installable app plus a push service).
+1. **Satellite hole maps** (Hole19, 18Birdies): OpenStreetMap golf features where they exist, so green pins come pre-filled instead of being dropped by hand.
+2. **Full shot tracking and strokes gained** (Arccos, Shot Scope): record every shot's start, end and lie to compute true strokes gained rather than estimates.
+3. **Real push notifications**: needs a push service (VAPID keys and a scheduled function). On iPhone they only work for the installed Home Screen app.
+4. **Apple Watch / Wear OS companion** for the scorecard (Hole19, Garmin).
+5. **Swing video capture** with a side-by-side and a drawing tool (V1 Golf). This is heavier and best linked out to at first.
+6. **Groups and events**: a shared scorecard for a four-ball and simple season-long competitions on top of the friends system.
