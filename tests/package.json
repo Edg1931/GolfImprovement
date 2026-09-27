@@ -1,0 +1,12 @@
+{
+  "name": "fairway-lab-tests",
+  "private": true,
+  "scripts": {
+    "test": "npm run test:api && npm run test:e2e",
+    "test:api": "node --test \"api/*.test.js\"",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1"
+  }
+}

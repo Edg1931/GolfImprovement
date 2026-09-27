@@ -21,8 +21,8 @@ A complete, self-contained golf app for lowering your handicap. You can install 
 
 ## Running it
 
-- **Locally:** open `index.html` in any modern browser. Nothing to install.
-- **Vercel:** import this repository in Vercel with Framework Preset **Other**, no build command, and the output directory left as the repo root. Vercel serves `index.html` as a static site.
+- **Locally:** serve the `public/` folder (for example `cd tests && npm install && node serve.js`, then open http://localhost:4173). Opening `public/index.html` directly also works, minus offline mode and course search.
+- **Vercel:** import this repository with Framework Preset **Other** and no build command. Vercel serves `public/` as the site and `api/` as serverless functions.
 - **Try it with data:** go to *Tools → Load demo data* to see every page populated.
 
 ## Course search setup
@@ -35,10 +35,28 @@ Course search uses [GolfCourseAPI](https://golfcourseapi.com) (free tier) throug
 
 Without a key, the app still works: courses can be entered by hand and saved to the library.
 
+## Environment variables (Vercel)
+
+| Variable | What it enables |
+| --- | --- |
+| `GOLF_COURSE_API_KEY` | Course search and auto-fill ([golfcourseapi.com](https://golfcourseapi.com), free tier) |
+| `ANTHROPIC_API_KEY` | AI round summaries (Claude), for signed-in users, capped at 10 per person per day |
+
+Accounts, sync and friends use Supabase; the public URL and publishable key are in `public/js/config.js` and every `golf_` table is protected by row-level security.
+
+## Tests
+
+```
+cd tests && npm install && npx playwright install chromium
+npm test          # API tests (node:test) + browser tests (Playwright, desktop and phone)
+```
+
+GitHub Actions runs the same suite on every push (`.github/workflows/tests.yml`).
+
 ## Structure
 
 ```
-./
+public/
   index.html          app shell and navigation
   css/styles.css      design tokens, light/dark themes, responsive layout
   js/data/drills.js   drill library
