@@ -40,13 +40,6 @@ function asHoles(x) {
   if ('par' in x) return [x];
   return Object.keys(x).sort((a, b) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0)).map(k => x[k]).filter(h => h && typeof h === 'object');
 }
-/* A brief description of a value's shape (types only, no data) for the logs. */
-function shape(x, depth) {
-  if (Array.isArray(x)) return depth > 1 ? 'array' : '[' + (x.length ? shape(x[0], depth + 1) : '') + ']';
-  if (x && typeof x === 'object') return depth > 1 ? 'object' : '{' + Object.keys(x).slice(0, 12).map(k => k + ':' + shape(x[k], depth + 1)).join(',') + '}';
-  return typeof x;
-}
-
 function normalizeCourse(c) {
   const club = (c.club_name || '').trim(), course = (c.course_name || '').trim();
   const name = !course || course === club ? club || course : (club ? `${club} – ${course}` : course);
@@ -87,11 +80,9 @@ async function handler(req, res) {
     let body;
     if (id) {
       const data = await upstream('/courses/' + encodeURIComponent(id), key);
-      console.log('GolfCourseAPI detail shape', shape(data, 0), shape((data.course || data).tees, 0));
       body = { course: normalizeCourse(data.course || data) };
     } else if (q.length >= 3) {
       const data = await upstream('/search?search_query=' + encodeURIComponent(q), key);
-      if (data && Array.isArray(data.courses) && data.courses[0]) console.log('GolfCourseAPI course shape', shape(data.courses[0], 0));
       body = { courses: (data.courses || []).slice(0, 20).map(normalizeCourse) };
     } else {
       res.statusCode = 400; res.end(JSON.stringify({ error: 'query_too_short' })); return;
