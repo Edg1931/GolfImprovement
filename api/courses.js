@@ -54,7 +54,8 @@ function normalizeCourse(c) {
   // search results carry only tee counts ({male: n, female: n}); the scorecard comes from /courses/:id
   const t2 = c.tees || {};
   const teeCount = typeof t2.male === 'number' || typeof t2.female === 'number' ? (t2.male || 0) + (t2.female || 0) : null;
-  return { id: c.id, name, city: loc.city || '', state: loc.state || '', country: loc.country || '', tees: tees.filter(x => x.holes.length), teeCount, detailed: teeCount == null };
+  const lat = numOrNull(loc.latitude), lon = numOrNull(loc.longitude);
+  return { id: c.id, name, city: loc.city || '', state: loc.state || '', country: loc.country || '', lat, lon, tees: tees.filter(x => x.holes.length), teeCount, detailed: teeCount == null };
 }
 
 async function upstream(path, key) {

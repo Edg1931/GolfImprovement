@@ -19,6 +19,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" />
+  <link rel="stylesheet" href="js/vendor/leaflet/leaflet.css" />
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
@@ -39,6 +40,7 @@
       <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
       <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.8"/><path d="M16 14.2a5 5 0 0 1 5.5 5"/></symbol>
       <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+      <symbol id="i-map" viewBox="0 0 24 24"><path d="M9 4 3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5L9 4Z"/><path d="M9 4v13.5M15 6.5V20"/></symbol>
       <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/></symbol>
     </defs>
   </svg>
@@ -68,6 +70,7 @@
         <li><a href="#/assessment" data-route="assessment"><svg class="ico"><use href="#i-target"/></svg>Skills Test</a></li>
         <li class="nav-group">Improve</li>
         <li><a href="#/plan" data-route="plan"><svg class="ico"><use href="#i-calendar"/></svg>Practice Schedule</a></li>
+        <li><a href="#/map" data-route="map"><svg class="ico"><use href="#i-map"/></svg>Course Map &amp; Caddie</a></li>
         <li><a href="#/drills" data-route="drills"><svg class="ico"><use href="#i-drill"/></svg>Drill Library</a></li>
         <li><a href="#/playbook" data-route="playbook"><svg class="ico"><use href="#i-book"/></svg>Playbook</a></li>
         <li><a href="#/clubs" data-route="clubs"><svg class="ico"><use href="#i-bag"/></svg>My Clubs</a></li>
@@ -86,7 +89,7 @@
     <nav class="tabbar" aria-label="Quick navigation">
       <a href="#/dashboard" data-route="dashboard"><svg class="ico"><use href="#i-home"/></svg><span>Home</span></a>
       <a href="#/plan" data-route="plan" data-also="sessions drills"><svg class="ico"><use href="#i-calendar"/></svg><span>Practice</span></a>
-      <a href="#/play" data-route="play" class="tab-play"><span class="tab-play-btn"><svg class="ico"><use href="#i-flag"/></svg></span><span>Play</span></a>
+      <a href="#/play" data-route="play" data-also="map" class="tab-play"><span class="tab-play-btn"><svg class="ico"><use href="#i-flag"/></svg></span><span>Play</span></a>
       <a href="#/stats" data-route="stats" data-also="rounds"><svg class="ico"><use href="#i-chart"/></svg><span>Stats</span></a>
       <a href="#/goals" data-route="goals" data-also="assessment playbook clubs tools friends account"><svg class="ico"><use href="#i-trophy"/></svg><span>Goals</span></a>
     </nav>
@@ -95,6 +98,7 @@
   <div class="toast-host" id="toastHost" aria-live="polite"></div>
 
   <script src="js/vendor/supabase.js"></script>
+  <script src="js/vendor/leaflet/leaflet.js"></script>
   <script src="js/config.js"></script>
   <script src="js/data/drills.js"></script>
   <script src="js/data/plans.js"></script>
@@ -109,5 +113,8 @@
   <script src="js/social.js"></script>
   <script src="js/share.js"></script>
   <script src="js/coach.js"></script>
+  <script src="js/caddie.js"></script>
+  <script src="js/coursemap.js"></script>
+  <script src="js/planner.js"></script>
 </body>
 </html>

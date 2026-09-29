@@ -602,6 +602,47 @@ canvas.spark { width: 110px; height: 30px; display: block; }
 .course-summary { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 12px; background: var(--green-100); border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent); }
 code { font-family: var(--mono); font-size: .85em; background: var(--surface-2); border: 1px solid var(--border); padding: 1px 5px; border-radius: 5px; }
 
+/* ---------- Course map & caddie ---------- */
+.map-bar { display: flex; flex-direction: column; gap: 10px; }
+.map-bar select { font: inherit; padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); max-width: 420px; }
+.hole-strip.light { display: flex; gap: 4px; overflow-x: auto; margin: 0; padding-bottom: 2px; }
+.hole-strip.light .hole-pill { min-width: 38px; background: var(--surface); border-color: var(--border-strong); color: var(--text); }
+.hole-strip.light .hole-pill small { color: var(--text-muted); }
+.hole-strip.light .hole-pill.mapped { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
+.hole-strip.light .hole-pill.cur { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); }
+.hole-strip.light .hole-pill.cur small { color: inherit; opacity: .8; }
+.map-layout { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(300px, 1fr); gap: 16px; align-items: start; }
+.map-slot { position: sticky; top: calc(var(--topbar-h) + 16px); height: calc(100vh - var(--topbar-h) - 140px); min-height: 420px; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); background: #1b2a20; }
+.hole-map { width: 100%; height: 100%; }
+@media (max-width: 900px) {
+  .map-layout { grid-template-columns: 1fr; }
+  .map-slot { position: relative; top: 0; height: 62vh; min-height: 360px; }
+}
+.leaflet-container { font: inherit; background: #1b2a20; }
+.leaflet-control-attribution { font-size: 10px; }
+.map-flag span { position: absolute; left: 3px; top: -2px; min-width: 18px; height: 16px; padding: 0 4px; border-radius: 3px 3px 3px 0; background: #e2513f; color: #fff; font-size: 10px; font-weight: 800; line-height: 16px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.5); }
+.map-flag::before { content: ""; position: absolute; left: 2px; top: -2px; width: 2px; height: 24px; background: #fff; box-shadow: 0 0 2px rgba(0,0,0,.6); }
+.map-flag:not(.cur) { opacity: .6; }
+.map-step span { display: flex; width: 22px; height: 22px; border-radius: 50%; background: #e6cf85; color: #12352a; font-weight: 800; font-size: 12px; align-items: center; justify-content: center; box-shadow: 0 1px 4px rgba(0,0,0,.5); }
+.caddie-best { display: flex; gap: 14px; align-items: center; margin-bottom: 10px; }
+.caddie-club { min-width: 64px; height: 64px; padding: 0 10px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-family: var(--display); font-size: 1.7rem; font-weight: 600; background: linear-gradient(135deg, var(--green-700), var(--green-900)); color: #fff; }
+.caddie-club.long { font-size: 1.05rem; font-family: var(--font); font-weight: 800; }
+.risk-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.risk { font-size: .74rem; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); }
+.risk.green { background: var(--green-100); color: var(--accent); }
+.risk.water { background: #e3eefb; color: #1f5fa5; }
+.risk.bunker { background: #fbf3e2; color: #8a5a10; }
+.risk.ob, .risk.trees { background: #fbe9e6; color: #a23a2e; }
+:root[data-theme="dark"] .risk { background: var(--surface-2); color: var(--text); }
+.caddie-table { font-size: .86rem; }
+.caddie-table tbody tr { cursor: pointer; }
+.caddie-table tr.sel td { background: var(--gold-soft); }
+.plays-like .field input { min-height: 38px; padding: 7px 10px; }
+.plan-list { margin: 0; padding-left: 1.2rem; }
+.plan-list li { padding: 4px 0; }
+.caddie-mini { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--gold-soft); border: 1px solid color-mix(in srgb, var(--gold) 35%, var(--border)); }
+.caddie-mini .entry-label { margin-bottom: 2px; }
+
 /* ---------- Motion ---------- */
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }

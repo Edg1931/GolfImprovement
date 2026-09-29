@@ -194,3 +194,72 @@ test('built-in coach writes a debrief with no account or AI key', async ({ page 
   await expect(page.locator('.modal #aiBox')).toContainText('This week');
   expect(errs).toEqual([]);
 });
+
+/* ---------- course map, shot planner and caddie ---------- */
+const fx = require('../fixtures/osm-course.js');
+const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkqG+pBwADcgGBmxAt3gAAAABJRU5ErkJggg==', 'base64');
+async function mapFixtures(context) {
+  await context.route('**/server.arcgisonline.com/**', r => r.fulfill({ contentType: 'image/png', body: PNG }));
+  await context.route('**/api/interpreter', r => r.fulfill({ contentType: 'application/json', body: JSON.stringify(fx.json) }));
+  await context.grantPermissions(['geolocation']);
+  await context.setGeolocation({ latitude: fx.ORIGIN.lat, longitude: fx.ORIGIN.lon, accuracy: 4 });
+}
+
+test('course map imports OpenStreetMap features and the caddie plans a hole', async ({ page, context }) => {
+  const errs = trackErrors(page); await mapFixtures(context); await withDemo(page);
+  await page.goto('/#/map');
+  await expect(page.locator('#mapSlot .leaflet-container')).toBeVisible();
+  await page.click('[data-action=mapMyLocation]');
+  await page.locator('#mapPanel [data-action=mapImportOSM]').first().click();
+  await expect(page.locator('.toast').last()).toContainText('Loaded 2 holes and 7 shapes');
+  const g = await page.evaluate(() => Planner.course().greens[0]);
+  expect(g.front && g.back).toBeTruthy();                            // front/back derived from the green outline
+  // a real tap on the map at the hole-2 green (par 3 over water)
+  await page.click('[data-action=mapHole][data-h="2"]');
+  await page.waitForFunction(() => Planner.s.fitted && Planner.s.fitted.endsWith(':2'));
+  const pt = await page.evaluate(q => { const cp = Planner.map.latLngToContainerPoint([q.lat, q.lon]); const r = Planner.el.getBoundingClientRect(); return { x: r.left + cp.x, y: r.top + cp.y }; }, fx.ll(225, 400));
+  await page.mouse.click(pt.x, pt.y);
+  await expect(page.locator('.caddie-card')).toContainText('Exp. score');
+  const best = await page.evaluate(() => Planner.s.recs[0]);
+  expect(['5i', '6i', '7i']).toContain(best.club);
+  expect(best.shares.water || 0).toBeLessThan(0.1);
+  await page.click('[data-action=mapAddStep]');
+  await expect(page.locator('.plan-list li')).toHaveCount(1);
+  expect(errs).toEqual([]);
+});
+
+test('GPS shots learn dispersion and the hole card shows caddie advice @phone', async ({ page, context }) => {
+  const errs = trackErrors(page); await mapFixtures(context); await withDemo(page);
+  // map the demo course from the fixture, then play hole 1
+  await page.evaluate(async json => { const c = App.state.courses.find(x => x.name === 'Home course'); CourseMap.apply(c, CourseMap.parseOSM(json), 'osm'); Store.save(); }, fx.json);
+  await page.goto('/#/play');
+  await page.selectOption('[data-change=playCourse]', { label: 'Home course · White' });
+  await page.click('form[data-form=startRound] button[type=submit]');
+  await expect(page.locator('.caddie-mini')).toContainText('yds to green');
+  await page.selectOption('[data-change=gpsClub]', 'Driver');
+  await page.click('[data-action=gpsMark]'); await expect(page.locator('.toast').last()).toContainText('Position marked');
+  const end = fx.ll(22, 238); await context.setGeolocation({ latitude: end.lat, longitude: end.lon, accuracy: 4 });
+  await page.click('[data-action=gpsMeasure]');
+  await expect(page.locator('.gps-read')).toContainText('right');
+  const shot = await page.evaluate(() => App.state.shotLog.slice(-1)[0]);
+  expect(shot.club).toBe('Driver'); expect(shot.lat).toBeGreaterThan(0); expect(shot.along).toBeGreaterThan(200);
+  await page.goto('/#/clubs');
+  await expect(page.locator('#dispChart')).toBeVisible();
+  expect(errs).toEqual([]);
+});
+
+test('a KML file from Google Earth adds a green and hazards', async ({ page, context }) => {
+  const errs = trackErrors(page); await mapFixtures(context); await withDemo(page);
+  const P = (x, y) => { const q = fx.ll(x, y); return q.lon + ',' + q.lat + ',0'; };
+  const kml = `<?xml version="1.0"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document>
+    <Placemark><name>Hole 1</name><LineString><coordinates>${P(0, 0)} ${P(0, 300)}</coordinates></LineString></Placemark>
+    <Placemark><name>Green 1</name><Polygon><outerBoundaryIs><LinearRing><coordinates>${P(-10, 290)} ${P(10, 290)} ${P(10, 310)} ${P(-10, 310)} ${P(-10, 290)}</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>
+    <Placemark><name>Pond</name><Polygon><outerBoundaryIs><LinearRing><coordinates>${P(20, 100)} ${P(60, 100)} ${P(60, 200)} ${P(20, 200)} ${P(20, 100)}</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>
+  </Document></kml>`;
+  await page.goto('/#/map');
+  await page.setInputFiles('#mapFile', { name: 'course.kml', mimeType: 'application/vnd.google-earth.kml+xml', buffer: Buffer.from(kml) });
+  await expect(page.locator('.toast').last()).toContainText('Imported 1 holes and 2 shapes');
+  const c = await page.evaluate(() => ({ types: Planner.course().map.features.map(f => f.type), green: !!Planner.course().greens[0].center }));
+  expect(c.types).toEqual(expect.arrayContaining(['green', 'water'])); expect(c.green).toBe(true);
+  expect(errs).toEqual([]);
+});
