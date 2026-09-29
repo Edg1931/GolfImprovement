@@ -39,13 +39,19 @@ function normalizeCourse(c) {
 
 async function upstream(path, key) {
   const r = await fetch(UPSTREAM + path, { headers: { Authorization: 'Key ' + key, Accept: 'application/json' } });
-  if (!r.ok) { const e = new Error('upstream ' + r.status); e.status = r.status; throw e; }
-  return r.json();
+  const text = await r.text();
+  if (!r.ok) {
+    // logged for Vercel runtime logs; never includes the key
+    console.error('GolfCourseAPI error', r.status, path.split('?')[0], text.slice(0, 300));
+    const e = new Error('upstream ' + r.status); e.status = r.status; throw e;
+  }
+  try { return JSON.parse(text); } catch (err) { console.error('GolfCourseAPI returned non-JSON', r.status, text.slice(0, 300)); throw err; }
 }
 
 async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
-  const key = process.env.GOLF_COURSE_API_KEY;
+  // tolerate a key pasted with spaces, line breaks or surrounding quotes
+  const key = (process.env.GOLF_COURSE_API_KEY || '').trim().replace(/^["']|["']$/g, '');
   if (!key) { res.statusCode = 501; res.end(JSON.stringify({ error: 'not_configured' })); return; }
   const url = new URL(req.url, 'http://x');
   const q = (url.searchParams.get('q') || '').trim().slice(0, 80);
@@ -64,6 +70,7 @@ async function handler(req, res) {
     res.setHeader('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=604800');   // course data rarely changes
     res.statusCode = 200; res.end(JSON.stringify(body));
   } catch (e) {
+    if (!e.status) console.error('Course search failed', e.name, e.message);
     res.statusCode = e.status === 401 || e.status === 403 ? 502 : e.status === 429 ? 429 : 502;
     res.end(JSON.stringify({ error: e.status === 429 ? 'rate_limited' : e.status === 401 || e.status === 403 ? 'bad_key' : 'upstream_error' }));
   }

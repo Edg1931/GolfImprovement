@@ -13,8 +13,11 @@ test('501 without a key, 400 for short queries, maps upstream errors', async () 
   delete process.env.GOLF_COURSE_API_KEY; assert.equal((await call('/api/courses?q=pebble')).statusCode, 501);
   process.env.GOLF_COURSE_API_KEY = 'k';
   assert.equal((await call('/api/courses?q=pe')).statusCode, 400);
-  global.fetch = async () => ({ ok: true, json: async () => ({ courses: [sample] }) });
+  global.fetch = async () => new Response(JSON.stringify({ courses: [sample] }), { status: 200 });
   const ok = await call('/api/courses?q=pebble'); assert.equal(ok.statusCode, 200); assert.equal(ok.body.courses[0].id, 7);
-  global.fetch = async () => ({ ok: false, status: 401 }); assert.equal((await call('/api/courses?q=pebble')).body.error, 'bad_key');
-  global.fetch = async () => ({ ok: false, status: 429 }); assert.equal((await call('/api/courses?q=pebble')).statusCode, 429);
+  global.fetch = async () => new Response('{"message":"Invalid key"}', { status: 401 }); assert.equal((await call('/api/courses?q=pebble')).body.error, 'bad_key');
+  global.fetch = async () => new Response('slow down', { status: 429 }); assert.equal((await call('/api/courses?q=pebble')).statusCode, 429);
+  process.env.GOLF_COURSE_API_KEY = ' "k"\n'; let sentAuth = null;
+  global.fetch = async (u, o) => { sentAuth = o.headers.Authorization; return new Response(JSON.stringify({ courses: [] }), { status: 200 }); };
+  await call('/api/courses?q=pebble'); assert.equal(sentAuth, 'Key k');
 });
