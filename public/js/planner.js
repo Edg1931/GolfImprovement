@@ -185,7 +185,7 @@ Views.map = function () {
   if (s.hole > n) s.hole = 1;
   App.after(() => { Planner.mount(); Planner.renderPanel(); });
   return `<div class="page-head"><div><p class="eyebrow">Caddie</p><h1>Course map &amp; shot planner</h1><p class="muted">Tap where you want to hit it. Your caddie uses your real shot pattern to pick the club and the aim.</p></div>
-      <div class="btn-row"><button class="btn sm" data-action="mapMyLocation">📍 My location</button></div></div>
+      <div class="btn-row"><button class="btn sm primary" data-action="openHoleView">🛰 Hole GPS view</button><button class="btn sm" data-action="mapMyLocation">📍 My location</button></div></div>
     ${courses.length ? `<div class="map-bar"><select data-change="mapCourse" aria-label="Course">${courses.map(x => `<option value="${x.id}" ${x.id === s.courseId ? 'selected' : ''}>${escapeHtml(x.name)}${x.tees ? ' · ' + escapeHtml(x.tees) : ''}</option>`).join('')}</select>
       <div class="hole-strip light">${[...Array(n)].map((_, k) => `<button class="hole-pill ${k + 1 === s.hole ? 'cur' : ''} ${c && c.map && c.map.holes[k + 1] ? 'mapped' : ''}" data-action="mapHole" data-h="${k + 1}"><small>${k + 1}</small>${c ? c.pars[k] : ''}</button>`).join('')}</div></div>`
       : `<div class="empty">Add a course first: search for it on the <a href="#/play">Play</a> page.</div>`}

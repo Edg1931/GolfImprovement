@@ -181,6 +181,7 @@ function playLive(lr) {
   const quick = [-1, 0, 1, 2, 3].map(d => par + d).filter(v => v > 0);
   html += `<div class="grid grid-2 mt"><div class="card hole-card">
     <div class="row-between"><div><p class="eyebrow">Hole ${no(i)}${n === 9 ? ` · ${i + 1} of 9` : ' of 18'}</p><h2 class="hole-title">Par ${par} <span class="muted">· ${lr.yards && lr.yards[i] ? lr.yards[i] + ' yds · ' : ''}SI ${cardSi[i]}</span></h2></div>${rec > 0 ? `<span class="badge">${'●'.repeat(Math.min(rec, 3))} ${rec} stroke${rec > 1 ? 's' : ''}</span>` : ''}</div>
+    ${lr.courseId ? '<button class="btn primary block hv-open" data-action="openHoleView">🛰 Hole GPS view</button>' : ''}
 
     ${caddieHintHtml(lr)}
     <div class="entry"><div class="entry-label">Score</div>
@@ -399,7 +400,7 @@ Object.assign(Actions, {
         App.state.shotLog.push({ id: uid(), date: todayISO(), club: g.club, yards: y, along: m.along, lat: m.lat, courseId: course ? course.id : null, hole: holeNo });
         g.lastLat = m.lat; Store.save();
       }
-      g.start = pos;
+      g.start = g.once ? null : pos; g.once = false;   // the hole view picks a club before each shot
       App.render();
     });
   },

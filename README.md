@@ -8,6 +8,7 @@ A complete, self-contained golf app for lowering your handicap. You can install 
 | --- | --- |
 | **Play a round** | Search any course and its rating, slope, par, stroke index and yardages fill in. Choose 18 holes, front 9 or back 9, then score hole by hole with net and Stableford totals, the WHS net-double-bogey cap and GPS shot distance. Nine-hole rounds count toward your index under the 2024 WHS expected-score rule. |
 | **Course Map & Caddie** | Satellite hole maps (Esri imagery) with greens, bunkers, water and fairways from OpenStreetMap, or uploaded as GeoJSON/KML, or drawn by hand. Tap a target and the caddie simulates your real shot pattern for every club to recommend the club and aim with the best expected score, with green/water/bunker odds. Build a shot-by-shot plan per hole. |
+| **Hole GPS view** | Full-screen satellite view for the course, turned so the hole runs up the screen. Live yardage to the middle, front and back of the green; drag the target to see the distance to it and on to the green, with the club for each and your shot pattern drawn at the target. Track shots, enter your score and move between holes without leaving the map. |
 | **Dispersion learning** | GPS shots on the live scorecard record each club's distance and left/right miss against what you aimed at; My Clubs shows the learned pattern and the caddie uses it. |
 | **Dashboard** | Handicap Index, trend chart, progress to target, this week's sessions, top three stroke-loss areas, 12-week program status |
 | **Rounds & Handicap** | Log rounds with stats. Calculates score differentials and your Handicap Index using the World Handicap System (best 8 of last 20, with the official table for fewer rounds) |
@@ -73,6 +74,7 @@ public/
   js/caddie.js        caddie engine: dispersion model, shot simulation, club/aim advice
   js/coursemap.js     course map data: OpenStreetMap and file import
   js/planner.js       hole map, shot planner, on-course caddie, dispersion chart
+  js/holeview.js      full-screen hole GPS view for use during a round
   api/courses.js      Vercel serverless course-search proxy
   sw.js               offline cache (service worker)
   manifest.webmanifest, icons/   installable-app metadata

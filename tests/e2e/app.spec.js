@@ -263,3 +263,54 @@ test('a KML file from Google Earth adds a green and hazards', async ({ page, con
   expect(c.types).toEqual(expect.arrayContaining(['green', 'water'])); expect(c.green).toBe(true);
   expect(errs).toEqual([]);
 });
+
+test('full-screen hole view: turned map, draggable target, score and shot tracking @phone', async ({ page, context }) => {
+  const errs = trackErrors(page); await mapFixtures(context); await withDemo(page);
+  await page.evaluate(async json => { const c = App.state.courses.find(x => x.name === 'Home course'); CourseMap.apply(c, CourseMap.parseOSM(json), 'osm'); Store.save(); }, fx.json);
+  await page.goto('/#/play');
+  await page.selectOption('[data-change=playCourse]', { label: 'Home course · White' });
+  await page.click('form[data-form=startRound] button[type=submit]');
+  await page.click('[data-action=openHoleView]');
+  await expect(page.locator('.hv-card')).toBeVisible();
+  await expect(page.locator('.tabbar')).toBeHidden();
+  // standing on the tee: 380 yds to the middle, a tee-shot target down the hole with a club
+  await expect(page.locator('#hvMid')).toHaveText(/^3[78]\d$/);
+  await expect(page.locator('#hvTarget')).toBeVisible();
+  await expect(page.locator('.hv-bubble.main .hv-club strong')).not.toBeEmpty();
+  const up = await page.evaluate(() => { const h = HoleView.info(); return { g: HoleView.toScreen(h.green), t: HoleView.toScreen(h.tee) }; });
+  expect(up.g.y).toBeLessThan(up.t.y - 200);                          // green at the top, tee at the bottom
+  expect(Math.abs(up.g.x - up.t.x)).toBeLessThan(10);
+  // drag the target to the right; round trip through the turned map keeps the point under the finger
+  const before = await page.evaluate(() => HoleView.s.target);
+  const box = await page.locator('#hvTarget').boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 40, box.y + box.height / 2 - 20, { steps: 4 }); await page.mouse.up();
+  const moved = await page.evaluate(b => { const t = HoleView.s.target, s = HoleView.toScreen(t), s0 = HoleView.toScreen(b); return { dx: s.x - s0.x, dy: s.y - s0.y }; }, before);
+  expect(moved.dx).toBeGreaterThan(30); expect(moved.dy).toBeLessThan(-10);
+  // tap the green: aim at the flag
+  await page.mouse.click(up.g.x, up.g.y);
+  expect(await page.evaluate(() => HoleView.s.target)).toBeNull();
+  await expect(page.locator('#hvTarget')).toHaveCount(0);
+  // caddie sheet
+  await page.click('.hv-bubble.main .hv-club');
+  await expect(page.locator('.hv-sheet')).toContainText('Caddie');
+  await page.locator('.hv-sheet [data-action=hvClub]').first().click();
+  await expect(page.locator('.hv-sheet')).toHaveCount(0);
+  // track a shot
+  await page.click('#hvTrack'); await page.click('.hv-sheet [data-action=hvMark][data-club="Driver"]');
+  await expect(page.locator('#hvTrack')).toContainText('Measure');
+  const end = fx.ll(-8, 235); await context.setGeolocation({ latitude: end.lat, longitude: end.lon, accuracy: 4 });
+  await expect(page.locator('#hvTrack small')).toHaveText(/^2\d\d yds so far$/);   // live as you walk
+  await page.click('#hvTrack');
+  await expect(page.locator('#hvTrack')).toContainText('last:');
+  expect(await page.evaluate(() => App.state.shotLog.slice(-1)[0].club)).toBe('Driver');
+  // score the hole and move on
+  await page.click('.hv-score'); await page.click('.hv-sheet .chip:has-text("Par")');
+  await page.click('.hv-sheet [data-action=hvHole]');
+  await expect(page.locator('.hv-hole span')).toHaveText('2');
+  expect(await page.evaluate(() => App.state.liveRound.holes[0].strokes)).toBe(4);
+  const up2 = await page.evaluate(() => { const h = HoleView.info(), b = HoleView.ball(h); return { g: HoleView.toScreen(h.green), b: HoleView.toScreen(b.pos) }; });
+  expect(up2.g.y).toBeLessThan(up2.b.y - 100);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(errs).toEqual([]);
+});
