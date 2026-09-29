@@ -63,6 +63,28 @@ const HoleView = {
     return proj.toLL(pick);
   },
 
+  /* The line of play from the ball (or tee) through any dogleg points ahead to the green. */
+  path(h, start) {
+    const from = start || h.tee; if (!from || !h.green) return [from, h.green].filter(Boolean);
+    const toGreen = yardsBetween(from, h.green);
+    const mid = (h.line || []).slice(1, -1).filter(p => yardsBetween(p, h.green) < toGreen - 10);
+    return [from, ...mid, h.green];
+  },
+  /* Shapes that belong to this hole: tagged with it, or lying along its line of play (and not another hole's green). */
+  holeFeatures(h) {
+    const c = h.c; if (!c.map || !h.green) return [];
+    const proj = Caddie.projector(h.green);
+    const line = this.path(h, h.tee || null).map(proj.toXY);
+    const segDist = (p, a, b) => { const dx = b.x - a.x, dy = b.y - a.y, L2 = dx * dx + dy * dy || 1; const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / L2)); return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy); };
+    const lineDist = p => line.length < 2 ? Math.hypot(p.x - line[0].x, p.y - line[0].y) : Math.min(...line.slice(1).map((b, i) => segDist(p, line[i], b)));
+    return (c.map.features || []).filter(f => {
+      if (f.hole != null && f.hole !== '' && +f.hole !== h.n) return false;
+      const xy = f.ll.map(proj.toXY);
+      if (f.type === 'green') return xy.some(q => Math.hypot(q.x, q.y) < 40);
+      return f.hole != null && f.hole !== '' ? true : xy.some(q => lineDist(q) < 45);
+    });
+  },
+
   /* ---------- map ---------- */
   ensureMap() {
     if (this.map || typeof L === 'undefined') return !!this.map;
@@ -94,7 +116,7 @@ const HoleView = {
   layout() {
     const slot = document.getElementById('hvSlot'), h = this.info(); if (!slot || !h) return;
     const W = slot.clientWidth, H = slot.clientHeight;
-    const top = 118, bottom = W < 700 ? 196 : 150, side = 36;
+    const top = 118, bottom = W < 700 ? 196 : 150, side = 16;
     const b = this.ball(h), start = b ? b.pos : null;
     const models = this.models();
     if (this.s.target === undefined) this.s.target = start ? this.defaultTarget(h, start, models) : null;
@@ -111,7 +133,9 @@ const HoleView = {
     if (pts.length === 1) pts.push({ x: pts[0].x + 40, y: pts[0].y + 40 }, { x: pts[0].x - 40, y: pts[0].y - 40 });
     const cs = Math.cos(phi), sn = Math.sin(phi);
     const uv = pts.map(p => ({ u: p.x * cs - p.y * sn, v: p.x * sn + p.y * cs }));
-    const u0 = Math.min(...uv.map(p => p.u)), u1 = Math.max(...uv.map(p => p.u)), v0 = Math.min(...uv.map(p => p.v)), v1 = Math.max(...uv.map(p => p.v));
+    let u0 = Math.min(...uv.map(p => p.u)), u1 = Math.max(...uv.map(p => p.u)), v0 = Math.min(...uv.map(p => p.v)), v1 = Math.max(...uv.map(p => p.v));
+    // frame just this hole: its corridor, a little behind the tee and past the green
+    if (this.s.zoom !== 'green') { u0 -= 32; u1 += 32; v0 -= 12; v1 += 22; }
     const aw = Math.max(80, W - 2 * side), ah = Math.max(120, H - top - bottom);
     const ppy = Math.min(aw / Math.max(20, u1 - u0), ah / Math.max(20, v1 - v0));   // pixels per yard
     const lat = ref.lat * Math.PI / 180;
@@ -124,7 +148,7 @@ const HoleView = {
     Object.assign(this.el.style, { width: D + 'px', height: D + 'px', transform: `translate(-50%, -50%) translate(0px, ${dy}px) rotate(${-phi}rad)` });
     this.map.invalidateSize({ animate: false, pan: false });
     this.map.setView([center.lat, center.lon], z, { animate: false });
-    this.g = { W, H, D, dy, theta: -phi };
+    this.g = { W, H, D, dy, theta: -phi, ppy: Math.pow(2, z) * 0.9144 / (156543.03 * Math.cos(lat)) };
   },
 
   toScreen(p) {
@@ -142,7 +166,8 @@ const HoleView = {
 
   drawFeatures() {
     const c = this.course(); this.layers.features.clearLayers(); if (!c || !c.map) return;
-    (c.map.features || []).forEach(f => {
+    const h = this.info(); if (!h) return;
+    this.holeFeatures(h).forEach(f => {
       if (f.type === 'fairway' || f.type === 'tee' || f.type === 'trees') return;   // the imagery already shows these
       const st = Object.assign({}, FEATURE_STYLE[f.type] || {}, { interactive: false, weight: 1.2 });
       st.fillOpacity = (st.fillOpacity || 0) * 0.6;
@@ -158,7 +183,8 @@ const HoleView = {
     const tgt = this.s.target || h.green;
     const S = p => this.toScreen(p);
     const bs = S(start), ts = S(tgt), gs = S(h.green);
-    let svg = '', html = '';
+    let svg = this.spotlight(h, start), html = '';
+    html += this.yardageBook(h, start);
     const d1 = start && tgt ? yardsBetween(start, tgt) : null;
     const d2 = this.s.target && h.green ? yardsBetween(this.s.target, h.green) : null;
     const club = d1 != null && models.length ? (this.s.club && models.find(m => m.club === this.s.club)) || this.clubFor(d1, models) : null;
@@ -177,6 +203,7 @@ const HoleView = {
     const bubble = (a, z, cls, inner) => {
       if (!a || !z) return '';
       const mx = (a.x + z.x) / 2, my = (a.y + z.y) / 2;
+      if (my < 150 || my > this.g.H - 240) return '';   // off the visible part of the map (e.g. zoomed to the green)
       const left = mx > this.g.W * 0.55;   // keep bubbles on the open side of the line
       const x = Math.max(8, Math.min(this.g.W - 180, left ? mx - 168 : mx + 18));
       return `<div class="hv-bubble ${cls}" style="left:${x}px;top:${my - 30}px">${inner}</div>`;
@@ -194,6 +221,65 @@ const HoleView = {
     box.innerHTML = `<svg class="hv-svg" width="${this.g.W}" height="${this.g.H}">${svg}</svg>${html}`;
     this.header(h, start);
   },
+  /* Darken everything but this hole: a soft-edged corridor along the line of play, plus the green. */
+  spotlight(h, start) {
+    const g = this.g, S = p => this.toScreen(p);
+    const k = g.ppy, green = S(h.green);
+    let cut = '';
+    if (this.s.zoom === 'green') { if (green) cut = `<circle cx="${green.x}" cy="${green.y}" r="${48 * k}"/>`; }
+    else {
+      // the whole hole stays lit from the tee, plus a pool of light where the ball is
+      const pts = this.path(h, h.tee || start).map(S).filter(Boolean);
+      const bs = start && start !== h.tee && S(start); if (bs) cut += `<circle cx="${bs.x}" cy="${bs.y}" r="${22 * k}"/>`;
+      if (pts.length >= 2) cut += `<polyline points="${pts.map(p => p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ')}" fill="none" stroke="#000" stroke-width="${64 * k}" stroke-linecap="round" stroke-linejoin="round"/>`;
+      if (green) cut += `<circle cx="${green.x}" cy="${green.y}" r="${34 * k}"/>`;
+    }
+    if (!cut) return '';
+    const blur = Math.max(8, 14 * k);
+    return `<defs><filter id="hvSoft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="${blur.toFixed(1)}"/></filter>
+      <mask id="hvMask" maskUnits="userSpaceOnUse" x="0" y="0" width="${g.W}" height="${g.H}"><rect width="${g.W}" height="${g.H}" fill="#fff"/><g filter="url(#hvSoft)" fill="#000">${cut}</g></mask></defs>
+      <rect class="hv-dim" width="${g.W}" height="${g.H}" mask="url(#hvMask)"/>`;
+  },
+  /* Yardage-book details: reach and carry for hazards ahead, 100/150/200 markers to the green, and the
+     front and back of the green when zoomed in. */
+  yardageBook(h, start) {
+    if (!start || !h.green) return '';
+    const S = p => this.toScreen(p), W = this.g.W;
+    const proj = Caddie.projector(start), gXY = proj.toXY(h.green), toGreen = Math.hypot(gXY.x, gXY.y);
+    let html = '';
+    const labels = [];
+    this.holeFeatures(h).filter(f => f.type === 'water' || f.type === 'bunker').forEach(f => {
+      const xy = f.ll.map(proj.toXY);
+      const ahead = xy.map(q => ({ q, o: Caddie.offsets({ x: 0, y: 0 }, gXY, q) })).filter(v => v.o.along > 15);
+      if (!ahead.length) return;
+      const ds = ahead.map(v => Math.hypot(v.q.x, v.q.y));
+      const reach = Math.round(Math.min(...ds)), carry = Math.round(Math.max(...ds));
+      if (reach > toGreen + 15) return;
+      const cen = Caddie.centroid(xy), lat = Caddie.offsets({ x: 0, y: 0 }, gXY, cen).lat;
+      if (Math.abs(lat) > 60) return;
+      labels.push({ f, reach, carry, cen: proj.toLL(cen), lat });
+    });
+    labels.sort((a, b) => a.reach - b.reach).slice(0, 6).forEach(l => {
+      const p = S(l.cen); if (!p) return;
+      const x = Math.max(4, Math.min(W - 58, p.x + (l.lat < 0 ? -62 : 14))), y = p.y - 22;
+      html += `<div class="hv-haz ${l.f.type}" style="left:${x}px;top:${y}px" title="${l.f.type === 'water' ? 'Water' : 'Bunker'}: reach ${l.reach}, carry ${l.carry}"><b>${l.carry}</b><span>${l.reach}</span></div>`;
+    });
+    if (this.s.zoom === 'green') {
+      [['front', 'F'], ['back', 'B']].forEach(([k, t]) => { const q = h[k] && S(h[k]); if (q) html += `<div class="hv-fbl" style="left:${q.x}px;top:${q.y}px">${t} ${Math.round(yardsBetween(start, h[k]))}</div>`; });
+      return html;
+    }
+    // layup markers measured back from the middle of the green along the line of play
+    const line = this.path(h, start).map(proj.toXY).reverse();
+    let total = 0; for (let i = 1; i < line.length; i++) total += Caddie.dist(line[i - 1], line[i]);
+    [100, 150, 200].forEach(d => {
+      if (d > total - 25) return;
+      const q = S(proj.toLL(Caddie.alongPolyline(line, d))); if (!q) return;
+      const t = this.s.target && S(this.s.target); if (t && Math.hypot(q.x - t.x, q.y - t.y) < 44) return;   // don't sit under the target
+      html += `<div class="hv-mark" style="left:${q.x}px;top:${q.y}px"><span>${d}</span></div>`;
+    });
+    return html;
+  },
+
   /* Numbers in the top bar change as the player walks, so they're updated in place. */
   header(h, start) {
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
@@ -222,7 +308,9 @@ const HoleView = {
       const p = pos(e);
       if (drag) { drag = false; this.afterMove(); return; }
       if (e.target.closest('button, .hv-bubble, a')) return;
-      if (Math.hypot(p.x - sx, p.y - sy) > 10) return;   // a scroll or swipe, not a tap
+      const dx = p.x - sx, dy = p.y - sy;
+      if (Math.abs(dx) > 70 && Math.abs(dy) < 60) { Actions.hvHole({ dataset: { d: dx < 0 ? '1' : '-1' } }); return; }   // swipe between holes
+      if (Math.hypot(dx, dy) > 10) return;   // a scroll, not a tap
       const h = this.info(); if (!h || !this.g) return;
       const t = this.fromScreen(p.x, p.y);
       // a tap on the green aims at the green

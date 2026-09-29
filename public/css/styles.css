@@ -732,3 +732,12 @@ body.hv-mode .toast-host { bottom: calc(210px + var(--safe-b)); }
 .hv-clubs .chip { min-height: 44px; min-width: 56px; font-size: 15px; }
 @keyframes sheet-up { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (min-width: 700px) { .hv-top { justify-content: center; } .hv-side { bottom: 170px; } }
+.hv-dim { fill: rgba(6, 12, 9, .64); }
+.hv-map { filter: saturate(1.12) contrast(1.04); }
+.hv-haz { position: absolute; z-index: 2; pointer-events: none; display: flex; flex-direction: column; align-items: center; min-width: 44px; padding: 3px 7px; border-radius: 10px; background: rgba(22, 26, 24, .86); border: 1.5px solid #f3e3b1; font-size: 13px; line-height: 1.15; box-shadow: 0 2px 6px rgba(0,0,0,.35); }
+.hv-haz.water { border-color: #6fb4ff; }
+.hv-haz b { font-size: 14px; }
+.hv-haz span { font-size: 11px; color: rgba(255,255,255,.72); border-top: 1px solid rgba(255,255,255,.25); width: 100%; text-align: center; }
+.hv-mark { position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px rgba(0,0,0,.35); pointer-events: none; }
+.hv-mark span { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 12px; font-weight: 700; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.9); }
+.hv-fbl { position: absolute; transform: translate(-50%, -140%); pointer-events: none; padding: 2px 8px; border-radius: 8px; background: rgba(22, 26, 24, .86); font-size: 13px; font-weight: 700; white-space: nowrap; }

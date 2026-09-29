@@ -280,6 +280,12 @@ test('full-screen hole view: turned map, draggable target, score and shot tracki
   const up = await page.evaluate(() => { const h = HoleView.info(); return { g: HoleView.toScreen(h.green), t: HoleView.toScreen(h.tee) }; });
   expect(up.g.y).toBeLessThan(up.t.y - 200);                          // green at the top, tee at the bottom
   expect(Math.abs(up.g.x - up.t.x)).toBeLessThan(10);
+  // just this hole: the rest is dimmed, with reach/carry for its hazards and layup markers
+  await expect(page.locator('.hv-dim')).toHaveCount(1);
+  await expect(page.locator('.hv-haz.water')).toHaveCount(1);
+  await expect(page.locator('.hv-haz.bunker')).toHaveCount(1);
+  expect(await page.locator('.hv-mark').count()).toBeGreaterThanOrEqual(1);   // ones under the target are hidden
+  expect(await page.evaluate(() => HoleView.holeFeatures(HoleView.info()).some(f => f.type === 'green' && f.ll.some(p => p.lon > -121.949)))).toBe(false);   // not hole 2's green
   // drag the target to the right; round trip through the turned map keeps the point under the finger
   const before = await page.evaluate(() => HoleView.s.target);
   const box = await page.locator('#hvTarget').boundingBox();
@@ -308,6 +314,10 @@ test('full-screen hole view: turned map, draggable target, score and shot tracki
   await page.click('.hv-score'); await page.click('.hv-sheet .chip:has-text("Par")');
   await page.click('.hv-sheet [data-action=hvHole]');
   await expect(page.locator('.hv-hole span')).toHaveText('2');
+  // swipe right to go back a hole, and left again
+  const sw = async dx => { await page.mouse.move(200, 500); await page.mouse.down(); await page.mouse.move(200 + dx, 505, { steps: 5 }); await page.mouse.up(); };
+  await sw(150); await expect(page.locator('.hv-hole span')).toHaveText('1');
+  await sw(-150); await expect(page.locator('.hv-hole span')).toHaveText('2');
   expect(await page.evaluate(() => App.state.liveRound.holes[0].strokes)).toBe(4);
   const up2 = await page.evaluate(() => { const h = HoleView.info(), b = HoleView.ball(h); return { g: HoleView.toScreen(h.green), b: HoleView.toScreen(b.pos) }; });
   expect(up2.g.y).toBeLessThan(up2.b.y - 100);
