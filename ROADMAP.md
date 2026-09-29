@@ -46,13 +46,14 @@ It also fixes bugs from the first version. Every tap re-rendered the page and ju
 | **Share cards** | Round and achievement images for the phone's share sheet. |
 | **Practice reminders** | Add the weekly plan to any calendar app with 30-minute alerts. |
 | **Friends and leaderboards** | Two-way friend codes; weekly practice, handicap, best score and rounds played. |
+| **Course map and caddie** | Satellite hole maps from OpenStreetMap, GeoJSON/KML upload or hand drawing; a shot planner that simulates your real dispersion to pick club and aim by expected strokes; caddie tips on the live scorecard. |
+| **Dispersion learning** | GPS shots record distance and left/right miss per club; My Clubs charts the pattern. |
 | **Automated tests** | API and browser tests on desktop and phone sizes, run by GitHub Actions on every push. |
 
 ## Recommended next features (by impact)
 
-1. **Satellite hole maps** (Hole19, 18Birdies): OpenStreetMap golf features where they exist, so green pins come pre-filled instead of being dropped by hand.
-2. **Full shot tracking and strokes gained** (Arccos, Shot Scope): record every shot's start, end and lie to compute true strokes gained rather than estimates.
-3. **Real push notifications**: needs a push service (VAPID keys and a scheduled function). On iPhone they only work for the installed Home Screen app.
-4. **Apple Watch / Wear OS companion** for the scorecard (Hole19, Garmin).
-5. **Swing video capture** with a side-by-side and a drawing tool (V1 Golf). This is heavier and best linked out to at first.
-6. **Groups and events**: a shared scorecard for a four-ball and simple season-long competitions on top of the friends system.
+1. **Full shot tracking and strokes gained** (Arccos, Shot Scope): record every shot's start, end and lie to compute true strokes gained rather than estimates.
+2. **Real push notifications**: needs a push service (VAPID keys and a scheduled function). On iPhone they only work for the installed Home Screen app.
+3. **Apple Watch / Wear OS companion** for the scorecard (Hole19, Garmin).
+4. **Swing video capture** with a side-by-side and a drawing tool (V1 Golf). This is heavier and best linked out to at first.
+5. **Groups and events**: a shared scorecard for a four-ball and simple season-long competitions on top of the friends system.
