@@ -821,3 +821,20 @@ body.hv-mode .toast-host { bottom: calc(210px + var(--safe-b)); }
 .gl-row:not(.mid) b { color: rgba(255,255,255,.82); }
 .gl-from { text-align: center; color: rgba(255,255,255,.6); font-size: 13px; margin: 8px 0; min-height: 16px; }
 .gl-score { min-height: 64px; border-radius: 16px; }
+
+/* Planning in the hole view */
+.hv-ball { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; background: #fff; border: 3px solid #e6cf85; box-shadow: 0 2px 6px rgba(0,0,0,.5); cursor: grab; touch-action: none; }
+.hv-tee { pointer-events: auto; cursor: grab; touch-action: none; }
+.hv-tee::after, .hv-ball::after { content: ""; position: absolute; inset: -14px; border-radius: 50%; }   /* bigger grab area */
+.hv-plan-line { position: absolute; height: 0; border-top: 3px dashed #e6cf85; transform-origin: 0 50%; pointer-events: none; filter: drop-shadow(0 1px 2px rgba(0,0,0,.6)); }
+.hv-step { position: absolute; transform: translate(14px, -50%); display: flex; align-items: center; gap: 4px; padding: 2px 8px 2px 2px; border-radius: 999px; background: rgba(22, 26, 24, .9); border: 1.5px solid #e6cf85; font-size: 12px; font-weight: 700; pointer-events: none; white-space: nowrap; }
+.hv-step b { width: 20px; height: 20px; border-radius: 50%; background: #e6cf85; color: #17201b; display: grid; place-items: center; font-size: 12px; }
+.hv-planstrip { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 54px; padding: 8px 12px; border-radius: 16px; background: rgba(22, 26, 24, .9); font-size: 14px; }
+.hv-plan-txt { min-width: 0; line-height: 1.3; }
+.hv-plan-txt b { color: #e6cf85; }
+.hv-plan-txt em { font-style: normal; color: rgba(255,255,255,.65); }
+.hv-plan-btns { display: flex; gap: 6px; flex: none; }
+.hv-plan-btns button { border: 0; border-radius: 10px; padding: 8px 10px; background: rgba(255,255,255,.14); color: #fff; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.hv-score.plan { background: #c39a2b; }
+.hv-score.plan:disabled { opacity: .5; }
+.hv-empty .btn-row { margin-top: 8px; }

@@ -436,3 +436,42 @@ test('strokes gained, shot map, partners and gapping after a round', async ({ pa
   await page.goto('/#/clubs'); await expect(page.locator('.gap-track')).toBeVisible();
   expect(errs).toEqual([]);
 });
+
+test('plan a hole shot by shot from home, then see the plan on the course @phone', async ({ page, context }) => {
+  const errs = trackErrors(page); await mapFixtures(context); await weatherFixtures(context); await withDemo(page);
+  await context.setGeolocation({ latitude: 40.0, longitude: -100.0, accuracy: 10 });   // nowhere near the course
+  await page.evaluate(async json => { const c = App.state.courses.find(x => x.name === 'Home course'); CourseMap.apply(c, CourseMap.parseOSM(json), 'osm'); Store.save(); }, fx.json);
+  await page.goto('/#/play');
+  await page.locator('li', { hasText: 'Home course' }).locator('[data-action=openHoleView]').click();
+  await expect(page.locator('.hv-planstrip')).toContainText('Plan this hole');
+  await expect(page.locator('#hvTrack')).toHaveCount(0);
+  // shot 1: the suggested tee-shot target down the fairway
+  await expect(page.locator('.hv-score.plan strong')).not.toHaveText('＋ Add shot');
+  await page.click('[data-action=hvAddShot]');
+  await expect(page.locator('.hv-planstrip')).toContainText('Plan:');
+  expect(await page.evaluate(() => !!HoleView.s.from)).toBe(true);
+  // shot 2: tap the green, add it: the plan is complete and the ball goes back to the tee
+  const g = await page.evaluate(() => HoleView.toScreen(HoleView.info().flag));
+  await page.mouse.click(g.x, g.y);
+  await page.click('[data-action=hvAddShot]');
+  await expect(page.locator('.toast').last()).toContainText('Hole 1 planned');
+  await expect(page.locator('.hv-step')).toHaveCount(2);
+  await expect(page.locator('.hv-planstrip')).toContainText('✓');
+  const plan = await page.evaluate(() => App.state.courses.find(c => c.name === 'Home course').plans[1]);
+  expect(plan).toHaveLength(2); expect(plan[0].club).toBe('Driver');
+  // drag the ball somewhere else to see distances from there, then put it back
+  await page.waitForFunction(() => HoleView.s.adviceKey === HoleView.adviceKey());
+  const b = await page.evaluate(() => HoleView.toScreen(HoleView.ball(HoleView.info()).pos));
+  await page.mouse.move(b.x, b.y); await page.mouse.down();
+  await page.mouse.move(b.x + 10, b.y - 150, { steps: 5 }); await page.mouse.up();
+  await expect(page.locator('.hv-planstrip')).toContainText('ball moved');
+  const mid = Number(await page.locator('#hvMid').textContent()); expect(mid).toBeLessThan(330);
+  await page.click('[data-action=hvBallReset]'); await expect(page.locator('#hvMid')).toHaveText(/^3[78]\d$/);
+  await page.click('[data-action=hvPlanUndo]'); await expect(page.locator('.hv-step')).toHaveCount(1);
+  // on the course, the plan shows on the hole card
+  await page.goto('/#/play');
+  await page.selectOption('[data-change=playCourse]', { label: 'Home course · White' });
+  await page.click('form[data-form=startRound] button[type=submit]');
+  await expect(page.locator('.caddie-mini')).toContainText('Your plan: Driver');
+  expect(errs).toEqual([]);
+});
