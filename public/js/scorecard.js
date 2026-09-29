@@ -82,8 +82,8 @@ function courseSearchCard() {
   else if (cs.error) body = '<div class="callout warn small mt mb0">Course search is unavailable right now. Try again shortly, or enter the course by hand.</div>';
   else if (cs.results && !cs.results.length) body = `<p class="small muted mt mb0">No courses found for “${escapeHtml(cs.q)}”. Try the club name or town.</p>`;
   else if (cs.results) body = `<ul class="course-results">${cs.results.map((c, ci) => `<li class="${cs.open === ci ? 'open' : ''}">
-      <button class="course-hit" data-action="courseOpen" data-i="${ci}"><div><strong>${escapeHtml(c.name)}</strong><div class="tiny muted">${escapeHtml([c.city, c.state, c.country].filter(Boolean).join(', '))} · ${c.tees.length} tee${c.tees.length === 1 ? '' : 's'}</div></div><span class="chev" aria-hidden="true"></span></button>
-      ${cs.open === ci ? `<div class="tee-list">${c.tees.length ? c.tees.map((t, ti) => `<button class="tee-opt" data-action="importTee" data-c="${ci}" data-t="${ti}"><span class="tee-swatch" style="background:${teeColor(t.name)}"></span><span><strong>${escapeHtml(t.name)}</strong>${t.gender === 'F' ? ' <span class="tiny muted">(W)</span>' : ''}<span class="tiny muted"> · ${t.rating ?? '—'}/${t.slope ?? '—'} · par ${t.par ?? sum(t.holes.map(h => h.par))}${t.yards ? ' · ' + t.yards + ' yds' : ''}${t.holes.length === 9 ? ' · 9 holes' : ''}</span></span><span class="btn sm primary">Use</span></button>`).join('') : '<p class="small muted">No scorecard data for this course.</p>'}</div>` : ''}
+      <button class="course-hit" data-action="courseOpen" data-i="${ci}"><div><strong>${escapeHtml(c.name)}</strong><div class="tiny muted">${escapeHtml([c.city, c.state, c.country].filter(Boolean).join(', '))}${(c.teeCount ?? c.tees.length) ? ` · ${c.teeCount ?? c.tees.length} tee${(c.teeCount ?? c.tees.length) === 1 ? '' : 's'}` : ''}</div></div><span class="chev" aria-hidden="true"></span></button>
+      ${cs.open === ci ? `<div class="tee-list">${c.loading ? '<p class="small muted"><span class="spinner"></span> Loading scorecard…</p>' : c.error ? `<p class="small">${escapeHtml(c.error)}</p>` : c.tees.length ? c.tees.map((t, ti) => `<button class="tee-opt" data-action="importTee" data-c="${ci}" data-t="${ti}"><span class="tee-swatch" style="background:${teeColor(t.name)}"></span><span><strong>${escapeHtml(t.name)}</strong>${t.gender === 'F' ? ' <span class="tiny muted">(W)</span>' : ''}<span class="tiny muted"> · ${t.rating ?? '—'}/${t.slope ?? '—'} · par ${t.par ?? sum(t.holes.map(h => h.par))}${t.yards ? ' · ' + t.yards + ' yds' : ''}${t.holes.length === 9 ? ' · 9 holes' : ''}</span></span><span class="btn sm primary">Use</span></button>`).join('') : '<p class="small muted">No scorecard data for this course.</p>'}</div>` : ''}
     </li>`).join('')}</ul>`;
   return `<div class="card"><div class="card-head"><h2>Step 2 · Find your course</h2><span class="tag">Auto-fill</span></div>
     <p class="small muted">Search any course: rating, slope, par, stroke index and yardages fill in automatically.</p>
@@ -363,7 +363,11 @@ Object.assign(Actions, {
   },
   cancelEdit() { if (!confirm('Discard your changes to this round?')) return; App.state.liveRound = null; Store.save(); location.hash = '#/rounds'; App.render(); },
   playHoles(el) { App.ui.playHoles = el.dataset.v; App.render(); },
-  courseOpen(el) { const cs = App.ui.cs; const i = parseInt(el.dataset.i, 10); cs.open = cs.open === i ? null : i; App.render(); },
+  courseOpen(el) {
+    const cs = App.ui.cs; const i = parseInt(el.dataset.i, 10); cs.open = cs.open === i ? null : i; App.render();
+    const c = cs.results[i];
+    if (cs.open === i && !c.detailed && !c.loading) loadCourseDetail(c);
+  },
   importTee(el) {
     const c = App.ui.cs.results[parseInt(el.dataset.c, 10)]; const t = c.tees[parseInt(el.dataset.t, 10)];
     const course = courseFromTee(c, t);
@@ -447,6 +451,20 @@ function courseFromTee(c, t) {
     pars, si, yards: holes.some(h => h.yards) ? holes.map(h => h.yards || null) : null, location: [c.city, c.state].filter(Boolean).join(', ') };
 }
 
+/* Search results list tee counts only; fetch the full scorecard when a course is opened. */
+function loadCourseDetail(c) {
+  c.loading = true; c.error = '';
+  fetch('api/courses?id=' + encodeURIComponent(c.id), { headers: { Accept: 'application/json' } })
+    .then(r => r.json().then(body => ({ ok: r.ok, body })))
+    .then(({ ok, body }) => {
+      if (!ok || !body.course) throw new Error(body.error === 'rate_limited' ? 'Too many lookups today. Try again tomorrow.' : 'Could not load this scorecard.');
+      Object.assign(c, body.course, { detailed: true });
+      if (!c.tees.length) c.error = 'No scorecard data for this course yet. Enter it by hand below.';
+    })
+    .catch(e => { c.error = navigator.onLine ? e.message : 'You are offline.'; })
+    .finally(() => { c.loading = false; App.render(); });
+}
+
 Object.assign(Forms, {
   editRound(form, v) {
     const r = App.state.rounds.find(x => x.id === v.id); if (!r) return;
@@ -465,7 +483,11 @@ Object.assign(Forms, {
     if (!navigator.onLine) { done({ error: 'offline' }); return; }
     fetch('api/courses?q=' + encodeURIComponent(q), { headers: { Accept: 'application/json' } })
       .then(r => r.json().catch(() => ({ error: r.status === 404 ? 'not_configured' : 'upstream_error' })).then(body => ({ ok: r.ok, status: r.status, body })))
-      .then(({ ok, body }) => ok && Array.isArray(body.courses) ? done({ results: body.courses, open: body.courses.length === 1 ? 0 : null }) : done({ error: body.error || 'upstream_error' }))
+      .then(({ ok, body }) => {
+        if (!(ok && Array.isArray(body.courses))) return done({ error: body.error || 'upstream_error' });
+        done({ results: body.courses, open: body.courses.length === 1 ? 0 : null });
+        if (body.courses.length === 1 && !body.courses[0].detailed) loadCourseDetail(App.ui.cs.results[0]);
+      })
       .catch(() => done({ error: navigator.onLine ? 'upstream_error' : 'offline' }));
   },
 });

@@ -107,7 +107,13 @@ test('course search imports a tee and fills the scorecard', async ({ page, conte
   const errs = trackErrors(page);
   const api = require('../../api/courses.js');
   const course = { id: 1, club_name: 'Pebble Beach Golf Links', location: { city: 'Pebble Beach', state: 'CA' }, tees: { male: [{ tee_name: 'Blue', course_rating: 74.9, slope_rating: 144, back_course_rating: 37.7, back_slope_rating: 147, total_yards: 6828, par_total: 72, number_of_holes: 18, holes: Array.from({ length: 18 }, (_, i) => ({ par: 4, yardage: 400, handicap: i + 1 })) }] } };
-  await context.route('**/api/courses*', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ courses: [api.normalizeCourse(course)] }) }));
+  // like the real API: search returns tee counts only, the scorecard comes from ?id=
+  const summary = { ...course, id: 'ab12cd34', tees: { male: 1, female: 0 } };
+  await context.route('**/api/courses*', r => {
+    const u = new URL(r.request().url());
+    const body = u.searchParams.get('id') ? { course: api.normalizeCourse({ ...course, id: 'ab12cd34' }) } : { courses: [api.normalizeCourse(summary)] };
+    r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+  });
   await page.goto('/'); await page.click('[data-action=skipOnboarding]'); await page.goto('/#/play');
   await page.fill('input[name=q]', 'pebble'); await page.click('.search-row button');
   await page.click('.tee-opt');

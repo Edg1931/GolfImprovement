@@ -58,7 +58,10 @@ function normalizeCourse(c) {
     asList(t.male).forEach(x => tees.push(normalizeTee(x, 'M')));
     asList(t.female).forEach(x => tees.push(normalizeTee(x, 'F')));
   }
-  return { id: c.id, name, city: loc.city || '', state: loc.state || '', country: loc.country || '', tees: tees.filter(x => x.holes.length) };
+  // search results carry only tee counts ({male: n, female: n}); the scorecard comes from /courses/:id
+  const t2 = c.tees || {};
+  const teeCount = typeof t2.male === 'number' || typeof t2.female === 'number' ? (t2.male || 0) + (t2.female || 0) : null;
+  return { id: c.id, name, city: loc.city || '', state: loc.state || '', country: loc.country || '', tees: tees.filter(x => x.holes.length), teeCount, detailed: teeCount == null };
 }
 
 async function upstream(path, key) {
@@ -79,11 +82,12 @@ async function handler(req, res) {
   if (!key) { res.statusCode = 501; res.end(JSON.stringify({ error: 'not_configured' })); return; }
   const url = new URL(req.url, 'http://x');
   const q = (url.searchParams.get('q') || '').trim().slice(0, 80);
-  const id = (url.searchParams.get('id') || '').replace(/\D/g, '');
+  const id = (url.searchParams.get('id') || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40);
   try {
     let body;
     if (id) {
-      const data = await upstream('/courses/' + id, key);
+      const data = await upstream('/courses/' + encodeURIComponent(id), key);
+      console.log('GolfCourseAPI detail shape', shape(data, 0), shape((data.course || data).tees, 0));
       body = { course: normalizeCourse(data.course || data) };
     } else if (q.length >= 3) {
       const data = await upstream('/search?search_query=' + encodeURIComponent(q), key);
