@@ -9,7 +9,7 @@ const UPSTREAM = 'https://api.golfcourseapi.com/v1';
 const numOrNull = v => { const n = parseFloat(v); return isNaN(n) ? null : n; };
 
 function normalizeTee(t, gender) {
-  const holes = Array.isArray(t.holes) ? t.holes : [];
+  const holes = asHoles(t.holes);
   return {
     name: t.tee_name || 'Tees',
     gender,
@@ -26,14 +26,38 @@ function normalizeTee(t, gender) {
   };
 }
 
+/* Tee lists arrive as arrays in the docs, but may also be a single tee object or an object keyed by id. */
+function asList(x) {
+  if (Array.isArray(x)) return x;
+  if (!x || typeof x !== 'object') return [];
+  if ('tee_name' in x || 'holes' in x || 'course_rating' in x) return [x];
+  return Object.values(x).flatMap(asList);
+}
+/* Hole lists: an array, or an object keyed by hole number. */
+function asHoles(x) {
+  if (Array.isArray(x)) return x.filter(h => h && typeof h === 'object');
+  if (!x || typeof x !== 'object') return [];
+  if ('par' in x) return [x];
+  return Object.keys(x).sort((a, b) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0)).map(k => x[k]).filter(h => h && typeof h === 'object');
+}
+/* A brief description of a value's shape (types only, no data) for the logs. */
+function shape(x, depth) {
+  if (Array.isArray(x)) return depth > 1 ? 'array' : '[' + (x.length ? shape(x[0], depth + 1) : '') + ']';
+  if (x && typeof x === 'object') return depth > 1 ? 'object' : '{' + Object.keys(x).slice(0, 12).map(k => k + ':' + shape(x[k], depth + 1)).join(',') + '}';
+  return typeof x;
+}
+
 function normalizeCourse(c) {
   const club = (c.club_name || '').trim(), course = (c.course_name || '').trim();
   const name = !course || course === club ? club || course : (club ? `${club} – ${course}` : course);
   const loc = c.location || {};
   const tees = [];
   const t = c.tees || {};
-  (t.male || []).forEach(x => tees.push(normalizeTee(x, 'M')));
-  (t.female || []).forEach(x => tees.push(normalizeTee(x, 'F')));
+  if (Array.isArray(t)) asList(t).forEach(x => tees.push(normalizeTee(x, x.gender === 'female' || x.gender === 'F' ? 'F' : 'M')));
+  else {
+    asList(t.male).forEach(x => tees.push(normalizeTee(x, 'M')));
+    asList(t.female).forEach(x => tees.push(normalizeTee(x, 'F')));
+  }
   return { id: c.id, name, city: loc.city || '', state: loc.state || '', country: loc.country || '', tees: tees.filter(x => x.holes.length) };
 }
 
@@ -63,6 +87,7 @@ async function handler(req, res) {
       body = { course: normalizeCourse(data.course || data) };
     } else if (q.length >= 3) {
       const data = await upstream('/search?search_query=' + encodeURIComponent(q), key);
+      if (data && Array.isArray(data.courses) && data.courses[0]) console.log('GolfCourseAPI course shape', shape(data.courses[0], 0));
       body = { courses: (data.courses || []).slice(0, 20).map(normalizeCourse) };
     } else {
       res.statusCode = 400; res.end(JSON.stringify({ error: 'query_too_short' })); return;
@@ -78,3 +103,4 @@ async function handler(req, res) {
 
 module.exports = handler;
 module.exports.normalizeCourse = normalizeCourse;
+module.exports.asList = asList;
