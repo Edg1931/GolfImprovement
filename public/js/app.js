@@ -56,6 +56,7 @@ const App = {
   },
   /* Focus areas for the plan: the biggest stroke-loss areas, or the weakest Skills Test areas when there are no round stats. */
   focusAreas() {
+    const sg = SG.focus(); if (sg.length) return sg;   // measured strokes gained beats estimates
     const st = roundStats(this.rounds(), 10);
     const areas = strokeLossAnalysis(st, this.targetHcp()).filter(a => a.loss >= 0.5).slice(0, 2);
     if (areas.length) return areas.map(a => ({ key: a.key, label: a.label, loss: a.loss, source: 'stats' }));

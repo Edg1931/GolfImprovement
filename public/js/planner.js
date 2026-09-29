@@ -66,7 +66,7 @@ const Planner = {
     return this.holeData().tee || null;
   },
   plan() { const c = this.course(); return (c && c.plans && c.plans[this.s.hole]) || []; },
-  adjust() { return (+this.s.wind || 0) + (+this.s.elev || 0); },
+  adjust() { return this.s.adj || 0; },   // plays-like yards for the current shot (set in compute)
 
   onTap(p) {
     const c = this.course(); if (!c) return;
@@ -90,6 +90,7 @@ const Planner = {
     const g = CourseMap.holeGeometry(c, s.hole, start);
     const models = Caddie.bagModels(App.state.clubs, App.state.shotLog, App.index());
     const t = g.proj.toXY(s.target);
+    s.adj = playsLikeYards(Caddie.dist(g.start, t), +s.wind || 0, +s.elev || 0);
     const recs = Caddie.recommend(g.start, t, models, { features: g.features, green: g.green }, { adjust: this.adjust(), samples: 250, seed: 11 });
     s.recs = recs.slice(0, 5).map(r => ({ ...r, aimLL: g.proj.toLL(r.aim), ellipseLL: Caddie.ellipse(g.start, r.aim, r.model, this.adjust()).map(g.proj.toLL),
       landLL: g.proj.toLL(Caddie.landing(g.start, r.aim, r.model.along - this.adjust(), r.model.lat)) }));
@@ -241,8 +242,8 @@ Object.assign(Actions, {
 
 Object.assign(Changes, {
   mapCourse(el) { Planner.s.courseId = el.value; Planner.s.hole = 1; Planner.s.target = null; Planner.s.recs = null; Planner.s.fitted = null; App.render(); },
-  mapWind(el) { Planner.s.wind = num(el.value, 0); if (Planner.s.target) { Planner.compute(); Planner.drawAll(); } Planner.renderPanel(); },
-  mapElev(el) { Planner.s.elev = num(el.value, 0); if (Planner.s.target) { Planner.compute(); Planner.drawAll(); } Planner.renderPanel(); },
+  mapWind(el) { Planner.s.wind = num(el.value, 0); if (App.route() === 'gps') { HoleView.afterMove(); return; } if (Planner.s.target) { Planner.compute(); Planner.drawAll(); } Planner.renderPanel(); },
+  mapElev(el) { Planner.s.elev = num(el.value, 0); if (App.route() === 'gps') { HoleView.afterMove(); return; } if (Planner.s.target) { Planner.compute(); Planner.drawAll(); } Planner.renderPanel(); },
   mapDrawType(el) { Planner.s.drawType = el.value; Planner.drawAll(); },
   mapFile(el) {
     const f = el.files[0]; const c = Planner.course(); if (!f || !c) return;
@@ -266,7 +267,7 @@ function caddieHint(lr) {
   const c = lr.courseId && App.state.courses.find(x => x.id === lr.courseId); if (!c) return null;
   const holeNo = (lr.first || 0) + lr.cur + 1;
   const fresh = App._lastPos && Date.now() - (App._lastPosAt || 0) < 60000;
-  const g = CourseMap.holeGeometry(c, holeNo, fresh ? App._lastPos : null);
+  const g = CourseMap.holeGeometry(c, holeNo, fresh ? App._lastPos : null, lr.pins && lr.pins[holeNo]);
   if (!g || !g.green) return null;
   const models = Caddie.bagModels(App.state.clubs, App.state.shotLog, App.index());
   const plan = (c.plans && c.plans[holeNo]) || [];
@@ -281,9 +282,56 @@ function caddieHintHtml(lr) {
   const openBtn = (label) => `<button class="btn sm" data-action="openHoleMap">${label}</button>`;
   if (!h) return lr.courseId ? `<div class="caddie-mini"><span class="small muted">Map this hole for club advice.</span>${openBtn('🗺 Map')}</div>` : '';
   const plan = h.plan.length ? `<div class="tiny muted">Your plan: ${h.plan.map(p => escapeHtml(p.club)).join(' → ')}</div>` : '';
+  const c = App.state.courses.find(x => x.id === lr.courseId);
+  const tip = h.from === 'the tee' && c ? smartTip(c, h.holeNo, lr.pins && lr.pins[h.holeNo]) : null;
   return `<div class="caddie-mini"><div><div class="entry-label">Caddie · ${h.toGreen} yds to green from ${h.from}</div>
-    <strong>${escapeHtml(h.club)}</strong>${h.aimShift ? ` · aim ${Math.abs(h.aimShift)} yds ${h.aimShift < 0 ? 'left' : 'right'}` : ''}${h.mapped ? ` <span class="small muted">· ${h.reach ? Math.round(h.green * 100) + '% green' : 'leaves about ' + h.leaves + ' yds'}${h.trouble >= 0.05 ? ` · ${Math.round(h.trouble * 100)}% trouble` : ''}</span>` : ''}${plan}</div>${openBtn('🗺 Plan')}</div>`;
+    <strong>${escapeHtml(h.club)}</strong>${h.aimShift ? ` · aim ${Math.abs(h.aimShift)} yds ${h.aimShift < 0 ? 'left' : 'right'}` : ''}${h.mapped ? ` <span class="small muted">· ${h.reach ? Math.round(h.green * 100) + '% green' : 'leaves about ' + h.leaves + ' yds'}${h.trouble >= 0.05 ? ` · ${Math.round(h.trouble * 100)}% trouble` : ''}</span>` : ''}${plan}${tip ? `<div class="small caddie-tip">💡 ${escapeHtml(tip)}</div>` : ''}</div>${openBtn('🗺 Plan')}</div>`;
 }
+/* One line of strategy for the tee shot on a mapped hole, from the player's own miss pattern and where the
+   trouble is: which club keeps it in play, and which side to favour. */
+function smartTip(course, holeNo, pin, cond) {
+  // wind is taken per 5 mph so small changes don't re-run the simulation
+  const w = cond && cond.windSrc ? { head: Math.round(cond.head / 5) * 5, cross: Math.round(cond.cross / 5) * 5 } : { head: 0, cross: 0 };
+  const key = [course.id, holeNo, pin ? pin.lat.toFixed(5) : '', App.state.shotLog.length, App.index(), w.head, w.cross].join(':');
+  smartTip._c = smartTip._c || {}; if (key in smartTip._c) return smartTip._c[key];
+  let out = null;
+  try { out = smartTipCalc(course, holeNo, pin, w); } catch (e) { console.warn('tip', e); }
+  return (smartTip._c[key] = out);
+}
+function smartTipCalc(course, holeNo, pin, wind) {
+  const g = CourseMap.holeGeometry(course, holeNo, null, pin);
+  if (!g || !g.green || !g.features.some(f => ['water', 'ob', 'bunker', 'trees'].includes(f.type))) return null;
+  const models = Caddie.bagModels(App.state.clubs, App.state.shotLog, App.index()); if (!models.length) return null;
+  const longest = models.reduce((a, m) => (m.along > a.along ? m : a));
+  const toGreen = Caddie.dist(g.start, g.green), par = course.pars[holeNo - 1];
+  let target = g.green;
+  if (par >= 4 && toGreen > longest.along + 15) {
+    const pts = [g.start, ...((g.line || []).slice(1, -1).filter(p => Caddie.dist(p, g.green) < toGreen - 10)), g.green];
+    let total = 0; for (let i = 1; i < pts.length; i++) total += Caddie.dist(pts[i - 1], pts[i]);
+    for (let d = 0; d <= total; d += 3) { const q = Caddie.alongPolyline(pts, d); if (Caddie.dist(q, g.start) >= longest.along) { target = q; break; } }
+  }
+  const course_ = { features: g.features, green: g.green };
+  // wind for a tee shot of about this length: plays-like yards and sideways drift
+  const tl0 = Caddie.dist(g.start, target), wx = { adjust: playsLikeYards(tl0, wind.head, 0), drift: Math.round(driftYards(tl0, wind.cross)) };
+  const teeModels = par >= 4 ? models.filter(m => m.along >= Math.min(longest.along, Caddie.dist(g.start, target)) * 0.7) : models;
+  const recs = Caddie.recommend(g.start, target, teeModels, course_, { samples: 160, seed: 7, ...wx });
+  if (!recs.length) return null;
+  const best = recs[0], drv = recs.find(r => r.club === longest.club);
+  const trouble = r => (r.shares.water || 0) + (r.shares.ob || 0) + (r.shares.trees || 0) + (r.shares.bunker || 0);
+  const pc = v => Math.round(v * 100) + '%';
+  const straight = Caddie.simulate(g.start, target, par >= 4 ? longest : best.model, course_, { samples: 300, seed: 9, ...wx });
+  const tl = straight.trouble.left, tr = straight.trouble.right;
+  const side = tl >= 0.06 && tl > tr * 1.5 ? 'left' : tr >= 0.06 && tr > tl * 1.5 ? 'right' : null;
+  const m = (par >= 4 ? longest : best.model), miss = m.learned && Math.abs(m.lat) >= 4 ? (m.lat > 0 ? 'right' : 'left') : null;
+  const aim = r => r.aimShift ? `aim ${Math.abs(Math.round(r.aimShift))} yds ${r.aimShift < 0 ? 'left' : 'right'}` : 'aim straight at it';
+  if (par >= 4 && drv && best.club !== drv.club && drv.expected - best.expected >= 0.05 && trouble(drv) - trouble(best) >= 0.05)
+    return `${best.club} off the tee: your driver finds trouble ${pc(trouble(drv))} of the time here, the ${best.club} ${pc(trouble(best))}. ${aim(best).replace(/^./, c => c.toUpperCase())}.`;
+  const windy = Math.abs(wx.drift) >= 4 ? ` (with the wind from the ${wind.cross > 0 ? 'right' : 'left'})` : '';
+  if (side) return `Trouble is ${side}${windy}${miss === side ? ` and your ${m.club} misses ${side}` : ''}: ${best.aimShift ? aim(best) : `favour the ${side === 'left' ? 'right' : 'left'} side`}.`;
+  if (miss) return `Your ${m.club} misses ${miss} by about ${Math.abs(Math.round(m.lat))} yds: ${aim(best)}.`;
+  return null;
+}
+
 Actions.openCourseMap = function (el) { App.ui.plan = { courseId: el.dataset.id, hole: 1, startMode: 'tee', fitted: null }; location.hash = '#/map'; };
 Actions.openHoleMap = function () {
   const lr = App.state.liveRound; if (!lr || !lr.courseId) return;
@@ -337,9 +385,29 @@ function dispersionCard() {
     <div class="grid grid-2"><div><canvas id="dispChart" class="chart tall"></canvas></div>
     <div><div class="stat-row">${statBox('Typical', Math.round(m.along) + ' yds', m.n ? m.n + ' GPS shots' : 'estimate')}${statBox('Average miss', Math.abs(m.lat) < 1 ? 'Straight' : Math.abs(Math.round(m.lat)) + ' yds ' + (m.lat > 0 ? 'R' : 'L'), m.learned ? 'learned' : 'estimate')}${statBox('Width', '±' + w(m.latSD) + ' yds', '3 in 4 shots')}${statBox('Depth', '±' + w(m.alongSD) + ' yds', 'short / long')}</div>
       <p class="small mt mb0">${m.learned ? (Math.abs(m.lat) >= 4 ? `Your ${escapeHtml(sel)} leaks ${m.lat > 0 ? 'right' : 'left'}: the caddie aims you ${Math.abs(Math.round(m.lat))} yds ${m.lat > 0 ? 'left' : 'right'} to compensate.` : `Your ${escapeHtml(sel)} is centred on your target. Good.`) : 'Track a few shots with this club on the course and this becomes your real pattern.'}</p></div></div>
+    ${gappingHtml(models)}
     <div class="table-wrap mt"><table><thead><tr><th>Club</th><th class="num">Shots</th><th class="num">Typical</th><th class="num">Avg miss</th><th class="num">Width</th><th></th></tr></thead><tbody>
     ${models.map(x => `<tr><td><strong>${escapeHtml(x.club)}</strong></td><td class="num">${x.nLat}</td><td class="num">${Math.round(x.along)}</td><td class="num">${Math.abs(x.lat) < 1 ? '—' : Math.abs(Math.round(x.lat)) + (x.lat > 0 ? ' R' : ' L')}</td><td class="num">±${w(x.latSD)}</td><td>${x.learned ? '<span class="badge good">learned</span>' : '<span class="badge neutral">estimate</span>'}</td></tr>`).join('')}</tbody></table></div></div>`;
 }
+/* Gaps between clubs using on-course distances where they've been learned (chart distances otherwise). */
+function gappingHtml(models) {
+  const list = models.slice().sort((a, b) => b.along - a.along); if (list.length < 3) return '';
+  const issues = [];
+  const rows = list.map((m, i) => {
+    const next = list[i + 1]; if (!next) return { m };
+    const gap = m.along - next.along, wide = m.kind === 'driver' || m.kind === 'wood' ? 30 : m.kind === 'hybrid' || m.kind === 'longiron' ? 22 : 18;
+    const flag = gap < 6 ? 'overlap' : gap > wide ? 'gap' : '';
+    if (flag === 'overlap') issues.push(`Your ${m.club} and ${next.club} go about the same distance (${Math.round(m.along)} and ${Math.round(next.along)} yds)${m.learned || next.learned ? '' : ' by your chart'}: one of them could be swapped for a club that fills a gap.`);
+    if (flag === 'gap') issues.push(`There's a ${Math.round(gap)}-yard gap between your ${m.club} (${Math.round(m.along)}) and ${next.club} (${Math.round(next.along)})${next.kind === 'wedge' ? ': a gap wedge or a three-quarter swing covers it' : ': a club in between, or a practised knock-down shot, would help'}.`);
+    return { m, gap, flag };
+  });
+  const lo = list[list.length - 1].along, hi = list[0].along, pos = v => 4 + 92 * (v - lo) / Math.max(1, hi - lo);
+  return `<h3 class="mt">Gapping <span class="small muted">· real distances where learned</span></h3>
+    <div class="gap-track">${rows.map(r => `<span class="gap-dot ${r.m.learned ? 'learned' : ''}" style="left:${pos(r.m.along).toFixed(1)}%" title="${escapeHtml(r.m.club)} ${Math.round(r.m.along)} yds"><i></i><b>${escapeHtml(r.m.club)}</b></span>`).join('')}
+      ${rows.filter(r => r.flag).map(r => { const next = list[list.indexOf(r.m) + 1]; return `<span class="gap-zone ${r.flag}" style="left:${pos(next.along).toFixed(1)}%;width:${Math.max(1, pos(r.m.along) - pos(next.along)).toFixed(1)}%"></span>`; }).join('')}</div>
+    ${issues.length ? `<ul class="small gap-issues">${issues.slice(0, 3).map(t => `<li>${escapeHtml(t)}</li>`).join('')}</ul>` : '<p class="small mb0">No overlaps or big gaps: every distance has a club.</p>'}`;
+}
+
 Actions.dispClub = function (el) { App.ui.dispClub = el.dataset.club; App.render(); };
 
 /* Scatter of shots around the target line (x: left/right, y: distance) with the learned ellipse. */

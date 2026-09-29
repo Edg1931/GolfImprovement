@@ -143,6 +143,7 @@ function playSetup() {
       <div class="hole-grid">${c.pars.map((p, i) => `<div class="hole-cell"><span>${i + 1}</span><input type="number" name="par_${i}" value="${p}" min="3" max="6" aria-label="Hole ${i + 1} par"><input type="number" name="si_${i}" value="${c.si[i]}" min="1" max="18" aria-label="Hole ${i + 1} stroke index"></div>`).join('')}</div>
       <div class="tiny muted mt">Top row: par · bottom row: stroke index</div>
     </div></details>
+    ${Group.formHtml()}
     ${sel ? '' : '<label class="field inline"><input type="checkbox" name="saveCourse" checked> Save this course to my library</label>'}
     <button class="btn primary lg" type="submit">Start ${mode === '18' ? '18-hole' : mode === 'front' ? 'front-nine' : mode === 'back' ? 'back-nine' : '9-hole'} round →</button>
     ${idx != null ? `<p class="tiny muted mb0">Your index ${fmt1(idx)} is used for net scoring and the net-double-bogey cap.${mode !== '18' ? ' Nine-hole scores count toward your index using the World Handicap System’s expected-score rule.' : ''}</p>` : `<p class="tiny muted mb0">No index yet: holes are capped at par + 5 until you have 3 rounds.${mode !== '18' ? ' Nine-hole rounds start counting once you have an index.' : ''}</p>`}
@@ -190,6 +191,7 @@ function playLive(lr) {
 
     <div class="entry"><div class="entry-label">Putts</div>
       <div class="seg">${[0, 1, 2, 3, 4].map(v => `<button class="${h.putts === v ? 'active' : ''}" data-action="holeSet" data-k="putts" data-v="${v}">${v}${v === 4 ? '+' : ''}</button>`).join('')}</div></div>
+    ${firstPuttEntry(h)}
 
     ${par >= 4 ? `<div class="entry"><div class="entry-label">Tee shot</div>
       <div class="seg">${FAIRWAY_OPTS.map(([v, l]) => `<button class="${h.fir === v ? 'active' : ''}" data-action="holeSet" data-k="fir" data-v="${v}">${l}</button>`).join('')}</div></div>` : ''}
@@ -203,7 +205,7 @@ function playLive(lr) {
     ${i === last && !complete ? `<p class="tiny muted mb0">Enter a score on every hole to finish. Missing: ${lr.holes.map((x, k) => x.strokes == null ? no(k) : null).filter(Boolean).join(', ')}.</p>` : ''}
   </div>
 
-  <div>${greenCard(lr, first + i)}
+  <div>${greenCard(lr, first + i)}${Group.card(lr)}
     <div class="card mt"><div class="card-head"><h3>Shot distance</h3><span class="tag">GPS</span></div>
       <p class="small muted">Pick the club, tap <em>Mark</em> where you hit from, walk to your ball, then tap <em>Measure</em>. Shots build your real distances in My Clubs.</p>
       <div class="field mb"><label>Club</label><select data-change="gpsClub"><option value="">Not recorded</option>${App.state.clubs.map(c => `<option ${gps.club === c.club ? 'selected' : ''}>${escapeHtml(c.club)}</option>`).join('')}</select></div>
@@ -244,6 +246,14 @@ function updateGreenYards() {
 }
 
 /* Compact scorecard table: two nines for 18 holes, one for a nine-hole round (first = 0 or 9). */
+/* First-putt distance, for putting strokes gained. Filled in automatically when a tracked approach finishes on the green. */
+const FIRST_PUTT_FT = [3, 6, 10, 15, 20, 30, 45, 60];
+function firstPuttEntry(h) {
+  if (h.putts === 0) return '';
+  return `<div class="entry"><div class="entry-label">First putt <span class="tiny muted">${h.fpAuto && h.firstPutt != null ? `· ${h.firstPutt} ft from GPS` : '· feet, for strokes gained'}</span></div>
+    <div class="seg fp-seg">${FIRST_PUTT_FT.map(v => `<button class="${h.firstPutt != null && !h.fpAuto && h.firstPutt === v ? 'active' : h.fpAuto && h.firstPutt != null && FIRST_PUTT_FT.reduce((a, b) => Math.abs(b - h.firstPutt) < Math.abs(a - h.firstPutt) ? b : a) === v ? 'auto' : ''}" data-action="holeSet" data-k="firstPutt" data-v="${v}">${v}${v === 60 ? '+' : ''}</button>`).join('')}</div></div>`;
+}
+
 function scorecardTable(holes, pars, si, first) {
   first = first || 0;
   const nine = (from) => {
@@ -305,10 +315,11 @@ function roundCardModal(r) {
   return `<p class="eyebrow">${fmtDate(r.date)}</p><h2>${escapeHtml(r.course || 'Round')}</h2>
     <div class="stat-row mb">${statBox('Gross', r.grossScore ?? r.score, r.holesPlayed === 9 ? (r.nine === 'back' ? 'back nine' : 'front nine') : '')}${statBox('Adjusted', r.score, 'for handicap')}${statBox('Differential', fmt1(r.diff), r.holesPlayed === 9 ? '18-hole equivalent' : '')}${r.putts != null ? statBox('Putts', r.putts) : ''}</div>
     ${scorecardTable(r.holes, r.pars, r.si, r.firstHole)}
+    ${sgRoundHtml(r)}${Group.resultsHtml(r)}
     ${s ? `<p class="small mt mb0">${s.dist.eagle + s.dist.birdie} birdies or better · ${s.dist.par} pars · ${s.dist.bogey} bogeys · ${s.dist.double + s.dist.triple} doubles+</p>` : ''}
     ${r.notes ? `<p class="small mt mb0"><strong>Notes:</strong> ${escapeHtml(r.notes)}</p>` : ''}
     ${aiBox(r)}
-    <div class="btn-row mt"><button class="btn" data-action="shareRound" data-id="${r.id}">↗ Share</button><button class="btn" data-action="editRound" data-id="${r.id}">✎ Edit round</button></div>`;
+    <div class="btn-row mt"><button class="btn" data-action="shareRound" data-id="${r.id}">↗ Share</button>${shotMapButton(r)}<button class="btn" data-action="editRound" data-id="${r.id}">✎ Edit round</button></div>`;
 }
 
 /* ---------- Actions for the scorecard ---------- */
@@ -317,7 +328,8 @@ Object.assign(Actions, {
   holeSet(el) {
     const lr = App.state.liveRound; const h = lr.holes[lr.cur]; const k = el.dataset.k;
     const v = k === 'fir' ? el.dataset.v : parseInt(el.dataset.v, 10);
-    h[k] = h[k] === v && k !== 'strokes' ? null : v;
+    h[k] = h[k] === v && k !== 'strokes' && !(k === 'firstPutt' && h.fpAuto) ? null : v;
+    if (k === 'firstPutt') h.fpAuto = false;
     if (k === 'putts' && h.strokes != null && h.putts != null && h.putts >= h.strokes) h.strokes = h.putts + 1;
     Store.save(); App.render();
   },
@@ -338,7 +350,9 @@ Object.assign(Actions, {
       score: adjustedGross(lr.holes, lr.pars, lr.si, lr.ch), grossScore: st.gross, holes: lr.holes.map(h => ({ ...h })), pars: lr.pars.slice(), si: (lr.siCard || lr.si).slice(),
       putts: st.putts, firHit: st.firHit, firPossible: st.firPossible, gir: st.gir, penalties: st.penalties, udAtt: st.udAtt, udMade: st.udMade,
       sandAtt: st.sandAtt, sandMade: st.sandMade, threePutts: st.threePutts, doubles: st.doubles, notes: (lr.notes || '').trim(),
-      ch: lr.ch, indexUsed: prevIdx, courseId: lr.courseId || null, mode: lr.mode, yards: lr.yards || null, siRank: lr.si.slice() };
+      ch: lr.ch, indexUsed: prevIdx, courseId: lr.courseId || null, mode: lr.mode, yards: lr.yards || null, siRank: lr.si.slice(),
+      pins: lr.pins || null, players: Group.results(lr) };
+    SG.prepare(r, App.state.courses.find(c => c.id === lr.courseId));
     if (nine) { r.holesPlayed = 9; r.nine = lr.mode === 'back' ? 'back' : lr.mode === 'front' ? 'front' : null; r.firstHole = lr.first || 0; r.diff18 = nineHoleDifferential(r.score, r.rating, r.slope, prevIdx); }
     if (editing) App.state.rounds[App.state.rounds.indexOf(editing)] = r; else App.state.rounds.push(r);
     App.state.liveRound = null; App.ui.gps = null; App.keepAwake(false); Store.save();
@@ -350,8 +364,9 @@ Object.assign(Actions, {
       ${r.score !== r.grossScore ? `<div class="callout info small">Adjusted to <strong>${r.score}</strong> for handicap (holes capped at net double bogey).</div>` : ''}
       <div class="stat-row mb">${statBox('Differential', fmt1(r.diff))}${statBox('Index', idx != null ? fmt1(idx) : '—', prevIdx != null && idx != null && idx !== prevIdx ? (idx < prevIdx ? '▼ ' : '▲ ') + fmt1(Math.abs(idx - prevIdx)) : '')}${statBox('Putts', r.putts ?? '—')}${statBox('GIR', r.gir ?? '—')}</div>
       ${scorecardTable(r.holes, r.pars, r.si, r.firstHole)}
+      ${sgRoundHtml(r)}${Group.resultsHtml(r)}
       ${aiBox(r)}
-      <div class="btn-row mt"><button class="btn primary" data-action="closeModal">Done</button><button class="btn" data-action="shareRound" data-id="${r.id}">↗ Share</button><button class="btn" data-action="goto" data-href="#/stats">See stats</button></div>`);
+      <div class="btn-row mt"><button class="btn primary" data-action="closeModal">Done</button>${shotMapButton(r)}<button class="btn" data-action="shareRound" data-id="${r.id}">↗ Share</button><button class="btn" data-action="goto" data-href="#/stats">See stats</button></div>`);
     announceAchievements(before);
   },
   /* Reopen a saved round: hole-by-hole rounds go back into the scorecard, quick-logged ones get a form. */
@@ -364,7 +379,8 @@ Object.assign(Actions, {
       mode: r.mode || (n === 9 ? (r.nine || 'nine') : '18'), first: r.firstHole || 0, pars: r.pars.slice(), siCard: r.si.slice(),
       si: r.siRank ? r.siRank.slice() : (n === 9 ? rankStrokeIndex(r.si) : r.si.slice()),
       ch: r.ch !== undefined ? r.ch : (App.index() != null ? (n === 9 ? courseHandicap9(App.index(), r.slope, r.rating, sum(r.pars)) : courseHandicap(App.index(), r.slope, r.rating, sum(r.pars))) : null),
-      yards: r.yards || null, notes: r.notes || '', cur: 0, holes: r.holes.map(h => ({ ...h })) };
+      yards: r.yards || null, notes: r.notes || '', cur: 0, holes: r.holes.map(h => ({ ...h })), pins: r.pins || null,
+      players: r.players ? r.players.filter(p => p.id !== 'me').map(p => ({ id: uid(), name: p.name, ch: p.ch, index: null, scores: (p.scores || []).slice() })) : undefined };
     Store.save(); App.closeModal(); location.hash = '#/play'; App.render(); App.toast('Editing round. Tap any hole to change it, then save.');
   },
   cancelEdit() { if (!confirm('Discard your changes to this round?')) return; App.state.liveRound = null; Store.save(); location.hash = '#/rounds'; App.render(); },
@@ -398,8 +414,16 @@ Object.assign(Actions, {
         const holeNo = lr ? (lr.first || 0) + lr.cur + 1 : null;
         const m = course ? measureShot(course, holeNo, g.club, g.start, pos) : { along: y, lat: null };
         App.state.shotLog.push({ id: uid(), date: todayISO(), club: g.club, yards: y, along: m.along, lat: m.lat, courseId: course ? course.id : null, hole: holeNo });
-        g.lastLat = m.lat; Store.save();
+        g.lastLat = m.lat;
       }
+      // every tracked shot on a live round also counts toward strokes gained
+      const lr = App.state.liveRound;
+      if (lr && y >= 1) {
+        const course = App.state.courses.find(c => c.id === lr.courseId), holeNo = (lr.first || 0) + lr.cur + 1;
+        const flag = (lr.pins && lr.pins[holeNo]) || (course ? CourseMap.holeInfo(course, holeNo).green : null);
+        const s = SG.record(lr, course, holeNo, g.club, g.start, pos, flag); if (s) { g.lastShot = s.id; g.lastLie = s.toLie; }
+      }
+      Store.save();
       g.start = g.once ? null : pos; g.once = false;   // the hole view picks a club before each shot
       App.render();
     });
@@ -440,15 +464,16 @@ Object.assign(Forms, {
     const first = mode === 'back' ? 9 : 0, n = mode === '18' ? 18 : 9;
     const take = arr => arr ? arr.slice(first, first + n) : null;
     const idx = App.index(); const lpars = take(pars), lsiCard = take(si);
-    let lr;
+    let lr, rs = { rating, slope };
     if (n === 18) {
       lr = { rating, slope, pars: lpars, si: lsiCard, ch: idx != null ? courseHandicap(idx, slope, rating, sum(lpars)) : null };
     } else {
-      const r9 = nineRating({ ...full, rating, slope }, mode === 'back' ? 'back' : 'front');
+      const r9 = nineRating({ ...full, rating, slope }, mode === 'back' ? 'back' : 'front'); rs = r9;
       lr = { rating: r9.rating, slope: r9.slope, pars: lpars, si: rankStrokeIndex(lsiCard), siCard: lsiCard, ch: courseHandicap9(idx, r9.slope, r9.rating, sum(lpars)) };
     }
     App.state.liveRound = Object.assign(lr, { id: uid(), date: v.date, courseId, course: full.name, tees: full.tees, mode, first, yards: take(full.yards), cur: 0,
       holes: lpars.map(() => ({ strokes: null, putts: null, fir: null, pen: 0, sand: false })) });
+    Group.attach(App.state.liveRound, v, rs);
     App.ui.gps = null; Store.save(); App.render(); App.toast('Round started. Good luck out there!');
   },
 });

@@ -48,12 +48,19 @@ It also fixes bugs from the first version. Every tap re-rendered the page and ju
 | **Friends and leaderboards** | Two-way friend codes; weekly practice, handicap, best score and rounds played. |
 | **Course map and caddie** | Satellite hole maps from OpenStreetMap, GeoJSON/KML upload or hand drawing; a shot planner that simulates your real dispersion to pick club and aim by expected strokes; caddie tips on the live scorecard. |
 | **Dispersion learning** | GPS shots record distance and left/right miss per club; My Clubs charts the pattern. |
+| **Hole GPS view** | Full-screen turned hole map with a draggable target, yardage book (hazard reach/carry, layup markers), swipe between holes. |
+| **Flag, wind and slope** | Pin position of the day; live wind and elevation from Open-Meteo feed plays-like yardages and crosswind aim. |
+| **Auto-advance and glance** | Next hole on arrival at its tee, score prompt off the green, big-number glance mode. |
+| **Strokes gained** | Per-shot lies from the map, first-putt distance, category split vs target handicap; drives the practice plan. |
+| **Shot map and sharing** | Post-round replay coloured by strokes gained, shareable hole image. |
+| **Smart tips and gapping** | Tee strategy from miss pattern and hazards; bag gaps from real distances. |
+| **Offline courses and partners** | Save a course's imagery before playing; up to four players with Stableford and skins. |
 | **Automated tests** | API and browser tests on desktop and phone sizes, run by GitHub Actions on every push. |
 
 ## Recommended next features (by impact)
 
-1. **Full shot tracking and strokes gained** (Arccos, Shot Scope): record every shot's start, end and lie to compute true strokes gained rather than estimates.
-2. **Real push notifications**: needs a push service (VAPID keys and a scheduled function). On iPhone they only work for the installed Home Screen app.
-3. **Apple Watch / Wear OS companion** for the scorecard (Hole19, Garmin).
+1. **Real push notifications**: needs a push service (VAPID keys and a scheduled function). On iPhone they only work for the installed Home Screen app.
+2. **Apple Watch / Wear OS companion** for glance yardages and scoring (Hole19, Garmin).
+3. **Partners on their own accounts**: send each partner's round to their account (needs an invite and consent flow).
 4. **Swing video capture** with a side-by-side and a drawing tool (V1 Golf). This is heavier and best linked out to at first.
-5. **Groups and events**: a shared scorecard for a four-ball and simple season-long competitions on top of the friends system.
+5. **Groups and events**: season-long competitions on top of the friends system.

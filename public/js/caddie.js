@@ -130,11 +130,11 @@
   /* Simulate `n` shots with `model` from start toward target; score where they finish. */
   function simulate(start, target, model, course, opts) {
     opts = opts || {};
-    const n = opts.samples || 300, r = rng(opts.seed || 1), adjust = opts.adjust || 0;
+    const n = opts.samples || 300, r = rng(opts.seed || 1), adjust = opts.adjust || 0, drift = opts.drift || 0;
     const fairways = course.features.some(f => f.type === 'fairway');
-    const shares = {}; let total = 0;
+    const shares = {}, side = { left: 0, right: 0 }; let total = 0;
     for (let i = 0; i < n; i++) {
-      const along = model.along - adjust + gauss(r) * model.alongSD, lat = model.lat + gauss(r) * model.latSD;
+      const along = model.along - adjust + gauss(r) * model.alongSD, lat = model.lat + drift + gauss(r) * model.latSD;
       const p = landing(start, target, along, lat);
       const lie = classify(p, course.features, fairways);
       const d = course.green ? dist(p, course.green) : 0;
@@ -143,9 +143,10 @@
       else if (lie === 'ob') s = 1 + (course.green ? strokesFrom('fairway', dist(start, course.green)) : 3);   // stroke and distance
       else s = strokesFrom(lie, d);
       total += s; shares[lie] = (shares[lie] || 0) + 1;
+      if (lie === 'water' || lie === 'ob' || lie === 'trees' || lie === 'bunker') side[lat < 0 ? 'left' : 'right']++;
     }
     Object.keys(shares).forEach(k => { shares[k] = shares[k] / n; });
-    return { expected: 1 + total / n, shares };
+    return { expected: 1 + total / n, shares, trouble: { left: side.left / n, right: side.right / n } };
   }
 
   /* Best clubs for a shot from `start` toward `target`, with the best aim for each.
@@ -174,11 +175,11 @@
   }
 
   /* Ellipse outline (for drawing) covering about three quarters of a club's shots. */
-  function ellipse(start, target, model, adjust, points) {
+  function ellipse(start, target, model, adjust, points, drift) {
     const k = 1.665, out = [];
     for (let i = 0; i < (points || 36); i++) {
       const t = 2 * Math.PI * i / (points || 36);
-      out.push(landing(start, target, model.along - (adjust || 0) + Math.sin(t) * model.alongSD * k, model.lat + Math.cos(t) * model.latSD * k));
+      out.push(landing(start, target, model.along - (adjust || 0) + Math.sin(t) * model.alongSD * k, model.lat + (drift || 0) + Math.cos(t) * model.latSD * k));
     }
     return out;
   }

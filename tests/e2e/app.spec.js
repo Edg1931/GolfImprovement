@@ -294,7 +294,8 @@ test('full-screen hole view: turned map, draggable target, score and shot tracki
   const moved = await page.evaluate(b => { const t = HoleView.s.target, s = HoleView.toScreen(t), s0 = HoleView.toScreen(b); return { dx: s.x - s0.x, dy: s.y - s0.y }; }, before);
   expect(moved.dx).toBeGreaterThan(30); expect(moved.dy).toBeLessThan(-10);
   // tap the green: aim at the flag
-  await page.mouse.click(up.g.x, up.g.y);
+  const gNow = await page.evaluate(() => HoleView.toScreen(HoleView.info().flag));
+  await page.mouse.click(gNow.x, gNow.y);
   expect(await page.evaluate(() => HoleView.s.target)).toBeNull();
   await expect(page.locator('#hvTarget')).toHaveCount(0);
   // caddie sheet
@@ -322,5 +323,116 @@ test('full-screen hole view: turned map, draggable target, score and shot tracki
   const up2 = await page.evaluate(() => { const h = HoleView.info(), b = HoleView.ball(h); return { g: HoleView.toScreen(h.green), b: HoleView.toScreen(b.pos) }; });
   expect(up2.g.y).toBeLessThan(up2.b.y - 100);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(errs).toEqual([]);
+});
+
+/* ---------- on-course extras: wind, slope, flag, tips, auto-advance, glance, offline, partners, strokes gained ---------- */
+async function weatherFixtures(context) {
+  await context.route('**/api.open-meteo.com/v1/forecast**', r => r.fulfill({ contentType: 'application/json', body: JSON.stringify({ current: { wind_speed_10m: 10, wind_direction_10m: 0, wind_gusts_10m: 16 } }) }));
+  // ground rises 10 m from the tee (southern point) to anything north of it
+  await context.route('**/api.open-meteo.com/v1/elevation**', r => {
+    const lats = new URL(r.request().url()).searchParams.get('latitude').split(',').map(Number);
+    r.fulfill({ contentType: 'application/json', body: JSON.stringify({ elevation: lats.map(l => l > fx.ORIGIN.lat + 0.0005 ? 30 : 20) }) });
+  });
+}
+const at = async (context, x, y) => { const p = fx.ll(x, y); await context.setGeolocation({ latitude: p.lat, longitude: p.lon, accuracy: 4 }); };
+async function startMappedRound(page, partners) {
+  await page.evaluate(async json => { const c = App.state.courses.find(x => x.name === 'Home course'); CourseMap.apply(c, CourseMap.parseOSM(json), 'osm'); Store.save(); }, fx.json);
+  await page.goto('/#/play');
+  await page.selectOption('[data-change=playCourse]', { label: 'Home course · White' });
+  if (partners) { await page.click('summary:has-text("Playing partners")'); await page.fill('[name=pname_0]', 'Sam'); await page.fill('[name=pidx_0]', '10'); }
+  await page.click('form[data-form=startRound] button[type=submit]');
+}
+
+test('hole view: live wind and slope, flag of the day, tee tip, auto-advance, glance and offline maps @phone', async ({ page, context }) => {
+  const errs = trackErrors(page); await mapFixtures(context); await weatherFixtures(context); await withDemo(page);
+  await startMappedRound(page, true);
+  await page.click('[data-action=openHoleView]');
+  // wind from the north on a hole that runs north: into the player, and uphill
+  await expect(page.locator('#hvWind')).toContainText('10 mph');
+  await expect(page.locator('.hv-bubble.main')).toContainText('plays');
+  const cd = await page.evaluate(() => HoleView.cur());
+  expect(cd.head).toBeGreaterThan(9); expect(cd.rise).toBeGreaterThan(8); expect(cd.adj).toBeGreaterThan(20);
+  await page.click('.hv-btn:has-text("Tools")');
+  await expect(page.locator('.hv-sheet')).toContainText('Wind 10 mph from the north');
+  await expect(page.locator('.hv-sheet')).toContainText('uphill');
+  await page.click('.hv-sheet .hv-close');
+  // a strategy tip on the tee (water left of the landing area)
+  await expect(page.locator('.hv-tip')).toBeVisible();
+  // flag of the day: tap on the green, 8 yds right and 6 short of the middle
+  await page.click('[data-action=hvPinMode]');
+  await expect(page.locator('.hv-hint')).toBeVisible();
+  const pinPt = await page.evaluate(q => HoleView.toScreen(q), fx.ll(8, 374));
+  await page.mouse.click(pinPt.x, pinPt.y);
+  await expect(page.locator('.hv-main small')).toHaveText('To the pin');
+  const pin = await page.evaluate(() => App.state.liveRound.pins[1]);
+  expect(Math.abs(pin.lat - fx.ll(8, 374).lat)).toBeLessThan(0.00003);
+  await expect(page.locator('#hvMid')).toHaveText(/^37\d$/);
+  await page.click('[data-action=hvZoom]');   // back to the whole hole
+  // track the tee shot and the approach: lies come from the map, the first putt from the approach
+  await page.click('#hvTrack'); await page.click('.hv-sheet [data-action=hvMark][data-club="Driver"]');
+  await at(context, -8, 235); await expect(page.locator('#hvTrack small')).toHaveText(/^2\d\d yds so far$/);
+  await page.click('#hvTrack'); await expect(page.locator('.hv-lie')).toContainText('Fairway');
+  await page.click('#hvTrack'); await page.click('.hv-sheet [data-action=hvMark][data-club="9i"]');
+  await at(context, 4, 371); await expect(page.locator('#hvTrack small')).toHaveText(/^13\d yds so far$/);
+  await page.click('#hvTrack'); await expect(page.locator('.hv-lie')).toContainText('Green');
+  const h0 = await page.evaluate(() => App.state.liveRound.holes[0]);
+  expect(h0.shots.map(s => s.fromLie + '>' + s.toLie)).toEqual(['tee>fairway', 'fairway>green']);
+  expect(h0.firstPutt).toBeGreaterThan(8); expect(h0.firstPutt).toBeLessThan(20); expect(h0.fpAuto).toBe(true);
+  // walking off the green without a score asks for it; partner scores go in the same sheet
+  await at(context, 0, 380); await page.waitForFunction(() => HoleView._onGreen === 1);
+  await at(context, 0, 440); await expect(page.locator('.hv-sheet')).toContainText('Hole 1 · Par 4');
+  await page.click('.hv-sheet .chip:has-text("Par")'); await page.click('.hv-sheet [data-k=putts][data-v="2"]');
+  await page.click('.hv-sheet [data-action=partnerStep][data-d="1"]');
+  await page.click('.hv-sheet .hv-close');
+  expect(await page.evaluate(() => App.state.liveRound.players[0].scores[0])).toBe(4);
+  // standing on the next tee moves the view there
+  await at(context, 60, 400); await expect(page.locator('.hv-hole span')).toHaveText('2');
+  // glance mode
+  await page.click('[data-action=hvGlance]');
+  await expect(page.locator('.glance #glM')).toHaveText(/^1[56]\d$/);
+  await page.click('.glance [data-action=hvGlance]');
+  // save the course's imagery for offline use
+  await page.click('.hv-btn:has-text("Tools")'); await page.click('[data-action=hvDownload]');
+  await expect(page.locator('.toast').last()).toContainText('saved for offline');
+  const n = await page.evaluate(async () => (await (await caches.open('fairwaylab-tiles')).keys()).length);
+  expect(n).toBeGreaterThan(20);
+  expect(await page.evaluate(() => App.state.courses.find(c => c.name === 'Home course').offline.tiles)).toBe(n);
+  expect(errs).toEqual([]);
+});
+
+test('strokes gained, shot map, partners and gapping after a round', async ({ page, context }) => {
+  const errs = trackErrors(page); await mapFixtures(context); await weatherFixtures(context); await withDemo(page);
+  await startMappedRound(page, true);
+  // two tracked shots on hole 1 through the same code path as GPS, then score every hole
+  await page.evaluate(({ a, b, c }) => {
+    const lr = App.state.liveRound, course = App.state.courses.find(x => x.id === lr.courseId);
+    const flag = CourseMap.holeInfo(course, 1).green;
+    SG.record(lr, course, 1, 'Driver', a, b, flag); SG.record(lr, course, 1, '9i', b, c, flag);
+    lr.holes.forEach((h, i) => { h.strokes = lr.pars[i] + (i % 3 === 0 ? 1 : 0); h.putts = 2; });
+    lr.holes[0].strokes = 4;
+    lr.players[0].scores = lr.holes.map((h, i) => lr.pars[i] + (i % 2));
+    Store.save();
+  }, { a: fx.ll(0, 0), b: fx.ll(-8, 235), c: fx.ll(4, 371) });
+  await page.goto('/#/play'); await page.reload();
+  await expect(page.locator('.group-card')).toContainText('Sam');
+  await page.click('[data-action=holeGo][data-i="17"]');
+  await page.click('[data-action=finishRound]');
+  const modal = page.locator('.modal');
+  await expect(modal).toContainText('Strokes gained vs a');
+  await expect(modal.locator('.group-table')).toContainText('Sam');
+  const r = await page.evaluate(() => { const r = App.rounds()[0]; return { sg: SG.round(r, App.targetHcp()), len: r.holes[0].len, d0: r.holes[0].shots[0].d0 }; });
+  expect(Math.abs(r.len - 380)).toBeLessThan(4); expect(Math.abs(r.d0 - r.len)).toBeLessThan(1);
+  expect(r.sg.ott).not.toBe(0); expect(r.sg.app).not.toBe(0); expect(r.sg.puttHoles).toBe(1);
+  expect(Math.abs(r.sg.total - (r.sg.ott + r.sg.app + r.sg.arg + r.sg.putt + r.sg.other))).toBeLessThan(1e-9);
+  // shot map and a shareable picture of the hole
+  await modal.locator('[data-action=openShotMap]').click();
+  await expect(page.locator('.shot-list li')).toHaveCount(2);
+  await expect(page.locator('#smSlot .leaflet-container')).toBeVisible();
+  const dl = page.waitForEvent('download'); await page.click('[data-action=shareShotHole]');
+  expect((await dl).suggestedFilename()).toMatch(/^hole-1-.*\.png$/);
+  // stats and clubs
+  await page.goto('/#/stats'); await expect(page.locator('.sg-total')).toBeVisible();
+  await page.goto('/#/clubs'); await expect(page.locator('.gap-track')).toBeVisible();
   expect(errs).toEqual([]);
 });

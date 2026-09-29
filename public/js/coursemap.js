@@ -197,12 +197,51 @@ const CourseMap = {
     return data;
   },
 
+  /* ---------- one hole ---------- */
+  /* Tee, middle of the green (saved pins first), and the line of play for a hole. */
+  holeInfo(course, n) {
+    const mh = (course.map && course.map.holes && course.map.holes[n]) || {};
+    const pins = (course.greens && course.greens[n - 1]) || {};
+    return { tee: mh.tee || null, green: pins.center || mh.green || null, front: pins.front || null, back: pins.back || null, line: mh.line || null };
+  },
+  /* The line of play from `from` (default the tee) through any dogleg points ahead to the green. */
+  holePath(course, n, from) {
+    const h = this.holeInfo(course, n); from = from || h.tee;
+    if (!from || !h.green) return [from, h.green].filter(Boolean);
+    const toGreen = yardsBetween(from, h.green);
+    const mid = (h.line || []).slice(1, -1).filter(p => yardsBetween(p, h.green) < toGreen - 10);
+    return [from, ...mid, h.green];
+  },
+  /* Shapes that belong to a hole: tagged with it, or lying along its line of play (and not another hole's green). */
+  holeShapes(course, n) {
+    const h = this.holeInfo(course, n);
+    if (!course.map || !h.green) return [];
+    const proj = Caddie.projector(h.green);
+    const line = this.holePath(course, n).map(proj.toXY);
+    const segDist = (p, a, b) => { const dx = b.x - a.x, dy = b.y - a.y, L2 = dx * dx + dy * dy || 1; const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / L2)); return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy); };
+    const lineDist = p => line.length < 2 ? Math.hypot(p.x - line[0].x, p.y - line[0].y) : Math.min(...line.slice(1).map((b, i) => segDist(p, line[i], b)));
+    const tagged = f => f.hole != null && f.hole !== '';
+    return (course.map.features || []).filter(f => {
+      if (tagged(f) && +f.hole !== n) return false;
+      const xy = f.ll.map(proj.toXY);
+      if (f.type === 'green') return xy.some(q => Math.hypot(q.x, q.y) < 40);
+      return tagged(f) || xy.some(q => lineDist(q) < 45);
+    });
+  },
+  /* Where a ball at `p` lies on hole n: tee, fairway, rough, bunker, green, water, trees or out of bounds. */
+  lieAt(course, n, p, flag) {
+    const g = this.holeGeometry(course, n, p, flag); if (!g) return 'fairway';
+    let lie = g.features.length ? Caddie.classify(g.start, g.features, g.features.some(f => f.type === 'fairway')) : 'fairway';
+    if (lie !== 'green' && g.green && Caddie.dist(g.start, g.green) <= (g.features.some(f => f.type === 'green') ? 0 : 12)) lie = 'green';   // no green outline: close to the flag counts
+    return lie;
+  },
+
   /* ---------- per-hole geometry in yards, for the caddie ---------- */
-  holeGeometry(course, holeNo, start) {
+  holeGeometry(course, holeNo, start, pin) {
     const map = course.map || { holes: {}, features: [] };
     const h = map.holes[holeNo] || {};
     const pins = course.greens && course.greens[holeNo - 1];
-    const greenLL = h.green || (pins && pins.center) || null;
+    const greenLL = pin || h.green || (pins && pins.center) || null;
     const origin = start || h.tee || greenLL || map.center;
     if (!origin) return null;
     const proj = Caddie.projector(origin);

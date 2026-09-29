@@ -227,6 +227,7 @@ Views.stats = function () {
       <p class="tiny muted mt mb0">Positive bars are areas where you give up strokes to the benchmark. Estimates, not strokes-gained calculations, but the ranking is what matters.</p></div>
   </div>`;
 
+  html += sgCard(rounds, n);
   html += `<div class="card mt"><h2>Priority focus areas</h2>
     ${recs.length ? recs.map((r, i) => `<div class="rank"><div class="n ${['', 'two', 'three'][i]}">${i + 1}</div><div>
       <h3>${r.area.label} <span class="badge ${r.area.loss > 2 ? 'bad' : 'warn'}">≈ ${fmt1(r.area.loss)} strokes</span></h3>
@@ -370,7 +371,7 @@ Views.plan = function () {
   <div class="callout mt"><strong>${tier.label} focus:</strong> ${tier.focus}</div>
   <div class="adapt-box ${adapted.focus.length ? 'on' : ''}"><label class="field inline"><input type="checkbox" data-change="adaptive" ${p.adaptive === false ? '' : 'checked'}> Adapt my plan to my weaknesses</label>
     ${p.adaptive === false ? '<p class="tiny muted mb0">Off: you get the standard plan for your level.</p>'
-      : adapted.focus.length ? `<p class="small mb0">This week leans toward <strong>${adapted.focus.map(f => escapeHtml(f.label) + (f.loss != null ? ` (≈${fmt1(f.loss)} strokes)` : '')).join('</strong> and <strong>')}</strong> ${adapted.focus[0].source === 'stats' ? 'from your last 10 rounds' : 'from your latest Skills Test'}. ${adapted.swaps} drill${adapted.swaps === 1 ? '' : 's'} swapped in, marked <span class="focus-tag">Focus</span>.</p>`
+      : adapted.focus.length ? `<p class="small mb0">This week leans toward <strong>${adapted.focus.map(f => escapeHtml(f.label) + (f.loss != null ? ` (≈${fmt1(f.loss)} strokes)` : '')).join('</strong> and <strong>')}</strong> ${adapted.focus[0].source === 'sg' ? 'from your strokes gained' : adapted.focus[0].source === 'stats' ? 'from your last 10 rounds' : 'from your latest Skills Test'}. ${adapted.swaps} drill${adapted.swaps === 1 ? '' : 's'} swapped in, marked <span class="focus-tag">Focus</span>.</p>`
       : '<p class="tiny muted mb0">Log rounds with stats or run the Skills Test and the plan will shift toward where you lose the most strokes.</p>'}</div>
   <p class="small muted mb0">${plan.filter(d => d.session).length} sessions · ${Math.round(totalMin / 60 * 10) / 10} hours this week · ${plan.filter(d => d.session && checks[d.day]).length} done</p></div>`;
 
