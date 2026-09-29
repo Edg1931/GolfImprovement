@@ -475,3 +475,47 @@ test('plan a hole shot by shot from home, then see the plan on the course @phone
   await expect(page.locator('.caddie-mini')).toContainText('Your plan: Driver');
   expect(errs).toEqual([]);
 });
+
+test('map an unmapped course from home: find it, tap tee and green, add a dogleg bend @phone', async ({ page, context }) => {
+  const errs = trackErrors(page); await mapFixtures(context); await weatherFixtures(context);
+  await context.route('**/nominatim.openstreetmap.org/search**', r => r.fulfill({ contentType: 'application/json', body: JSON.stringify([{ display_name: 'Riverside Golf Club, 1 River Rd, Springfield, CA', lat: String(fx.ORIGIN.lat + 0.0015), lon: String(fx.ORIGIN.lon) }]) }));
+  await withDemo(page);
+  await context.setGeolocation({ latitude: 40.0, longitude: -100.0, accuracy: 10 });   // at home
+  await page.evaluate(() => { App.state.courses.push({ id: 'rv1', name: 'Riverside GC', tees: 'Blue', rating: 70.1, slope: 125, pars: DEFAULT_PARS.slice(), si: DEFAULT_SI.slice() }); Store.save(); });   // entered by hand: no location, no map
+  await page.goto('/#/play');
+  await page.locator('li', { hasText: 'Riverside GC' }).locator('[data-action=openHoleView]').click();
+  // no location yet: search for the course
+  await expect(page.locator('.hv-setup.find')).toContainText('Where is Riverside GC?');
+  await page.click('.hv-search button[type=submit]');
+  await page.click('[data-action=hvPlacePick]');
+  await expect(page.locator('.hv-setup')).toContainText('tap it');
+  const tap = async q => {
+    const p = await page.evaluate(q => { const cp = HoleView.map.latLngToContainerPoint([q.lat, q.lon]); const r = HoleView.el.getBoundingClientRect(); return { x: r.left + cp.x, y: r.top + cp.y }; }, q);
+    await page.mouse.click(p.x, p.y);
+  };
+  await page.waitForTimeout(300);
+  await tap(fx.ll(0, 0));
+  await expect(page.locator('.hv-setup')).toContainText('middle of the green');
+  await tap(fx.ll(0, 380));   // inside the mapped-by-nobody green: the tap itself is the middle
+  await expect(page.locator('.hv-setup')).toHaveCount(0);
+  await expect(page.locator('#hvMid')).toHaveText(/^3[78]\d$/);
+  const up = await page.evaluate(() => { const h = HoleView.info(); return { g: HoleView.toScreen(h.green), t: HoleView.toScreen(h.tee) }; });
+  expect(up.g.y).toBeLessThan(up.t.y - 200);
+  // a dogleg bend
+  await page.click('.hv-btn:has-text("Tools")'); await page.click('[data-action=hvBendMode]');
+  await expect(page.locator('.hv-hint')).toContainText('dogleg');
+  const bend = await page.evaluate(q => HoleView.toScreen(q), fx.ll(20, 200));
+  await page.mouse.click(bend.x, bend.y);
+  const line = await page.evaluate(() => App.state.courses.find(x => x.name === 'Riverside GC').map.holes[1].line);
+  expect(line).toHaveLength(3);
+  // plan it straight away
+  await page.click('[data-action=hvAddShot]');
+  await expect(page.locator('.hv-planstrip')).toContainText('Plan:');
+  // next hole starts setup near this green
+  await page.click('.hv-next');
+  await expect(page.locator('.hv-hole span')).toHaveText('2');
+  await expect(page.locator('.hv-setup')).toContainText('tap it');
+  const c = await page.evaluate(() => { const m = HoleView.map.getCenter(); return { lat: m.lat, lon: m.lng }; });
+  expect(Math.abs(c.lat - fx.ll(0, 380).lat)).toBeLessThan(0.0005);
+  expect(errs).toEqual([]);
+});

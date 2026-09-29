@@ -92,9 +92,67 @@ const HoleView = {
     this.el = document.createElement('div'); this.el.className = 'hv-map';
     this.map = L.map(this.el, { zoomControl: false, attributionControl: false, dragging: false, touchZoom: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, zoomSnap: 0, maxZoom: 20, fadeAnimation: false, zoomAnimation: false, inertia: false });
     L.tileLayer(ESRI_TILES, { maxZoom: 20, maxNativeZoom: 19, crossOrigin: true }).addTo(this.map);
-    this.layers = { features: L.layerGroup().addTo(this.map) };
+    this.layers = { features: L.layerGroup().addTo(this.map), setup: L.layerGroup().addTo(this.map) };
+    this.map.on('click', e => this.onSetupTap({ lat: e.latlng.lat, lon: e.latlng.lng }));
     this.map.setView([39.5, -98.35], 4);
     return true;
+  },
+  /* Panning and zooming are only on while finding a hole on the satellite image. */
+  setInteractive(on) {
+    ['dragging', 'touchZoom', 'scrollWheelZoom', 'doubleClickZoom'].forEach(k => { if (this.map[k]) this.map[k][on ? 'enable' : 'disable'](); });
+  },
+
+  /* ---------- setting up a hole that isn't mapped: tap its tee, then its green ---------- */
+  needsSetup(h) { return !h.tee || !h.green; },
+  /* Somewhere to start looking for the hole: the last hole's green, the course, or the player. */
+  setupCenter(h) {
+    const c = h.c;
+    for (let n = h.n - 1; n >= 1; n--) { const p = CourseMap.holeInfo(c, n); if (p.green || p.tee) return { at: p.green || p.tee, z: 17 }; }
+    if (h.tee) return { at: h.tee, z: 17 };
+    if (c.map && c.map.center) return { at: c.map.center, z: 16 };
+    if (c.geo) return { at: c.geo, z: 16 };
+    return null;   // ask where the course is ("I'm at the course" uses GPS)
+  },
+  setupMount(slot, h) {
+    const W = slot.clientWidth, H = slot.clientHeight;
+    Object.assign(this.el.style, { width: W + 'px', height: H + 'px', transform: 'translate(-50%, -50%)' });
+    this.g = null;
+    this.map.invalidateSize({ animate: false, pan: false });
+    this.setInteractive(true);
+    const key = h.c.id + ':' + h.n;
+    if (this.s.setupView !== key) { const c = this.setupCenter(h); if (c) { this.map.setView([c.at.lat, c.at.lon], c.z, { animate: false }); this.s.setupView = key; } }
+    // every mapped shape, so greens and tees already known are easy to spot
+    this.layers.features.clearLayers(); this.layers.setup.clearLayers();
+    ((h.c.map && h.c.map.features) || []).forEach(f => L.polygon(f.ll.map(p => [p.lat, p.lon]), Object.assign({}, FEATURE_STYLE[f.type] || {}, { interactive: false })).addTo(this.layers.features));
+    Object.entries((h.c.map && h.c.map.holes) || {}).forEach(([n, x]) => {
+      if (x.tee) L.circleMarker([x.tee.lat, x.tee.lon], { radius: +n === h.n ? 8 : 5, color: '#fff', weight: 2, fillColor: +n === h.n ? '#e6cf85' : '#2a7a52', fillOpacity: 1, interactive: false }).addTo(this.layers.setup);
+      if (x.green) L.marker([x.green.lat, x.green.lon], { interactive: false, icon: L.divIcon({ className: 'map-flag' + (+n === h.n ? ' cur' : ''), html: `<span>${n}</span>`, iconSize: [22, 22], iconAnchor: [4, 20] }) }).addTo(this.layers.setup);
+    });
+    const box = document.getElementById('hvOver'); if (box) box.innerHTML = '';
+  },
+  onSetupTap(p) {
+    if (App.route() !== 'gps') return;
+    const h = this.info(); if (!h || !this.needsSetup(h)) return;
+    const c = h.c;
+    c.map = c.map || { holes: {}, features: [], source: 'manual' };
+    const mh = c.map.holes[h.n] = c.map.holes[h.n] || {};
+    if (!mh.tee) { mh.tee = CourseMap.pt(p); if (!c.map.center) c.map.center = CourseMap.pt(p); Store.save(); App.render(); App.toast(`Tee set for hole ${h.n}. Now tap the middle of the green.`); return; }
+    // on a mapped green, use its middle
+    const inside = (c.map.features || []).filter(f => f.type === 'green').find(f => { const pr = Caddie.projector(p); return Caddie.pointInPolygon({ x: 0, y: 0 }, f.ll.map(pr.toXY)); });
+    const g = inside ? CourseMap.pt(CourseMap.centroidLL(inside.ll)) : CourseMap.pt(p);
+    if (yardsBetween(mh.tee, g) < 60) { App.toast('That’s very close to the tee. Tap the middle of this hole’s green.'); return; }
+    mh.green = g; mh.line = [mh.tee, g];
+    if (!mh.par) mh.par = c.pars[h.n - 1];
+    c.greens = c.greens || {};
+    const old = c.greens[h.n - 1]; if (!old || !old.manual) c.greens[h.n - 1] = Object.assign({}, CourseMap.greenPins(c, h.n) || { center: g }, { fromMap: true });
+    Store.save(); this.s.key = null; App.render();
+    App.toast(`Hole ${h.n} mapped: ${Math.round(yardsBetween(mh.tee, g))} yds. Tap › for the next hole.`);
+  },
+  /* Put the tee and green of this hole back to "not set", to mark them again. */
+  unmap(h) {
+    const c = h.c; const mh = c.map && c.map.holes[h.n]; if (mh) { delete mh.tee; delete mh.green; delete mh.line; }
+    if (c.greens && c.greens[h.n - 1] && !c.greens[h.n - 1].manual) delete c.greens[h.n - 1];
+    this.s.setupView = null; Store.save();
   },
 
   mount() {
@@ -106,6 +164,8 @@ const HoleView = {
     const h = this.info();
     const key = h ? h.c.id + ':' + h.n : null;
     if (key !== this.s.key) { this.s.key = key; this.s.target = undefined; this.s.club = null; this.s.zoom = 'hole'; this.s.advice = null; this.s.mode = 'aim'; this.s.from = null; }
+    if (h && this.needsSetup(h)) { this.setupMount(slot, h); return; }
+    this.setInteractive(false); this.layers.setup.clearLayers();
     const ref = h && (h.flag || h.tee || h.c.geo);
     if (ref && !(Weather.wind && Date.now() - Weather.wind.at < 15 * 60000)) Weather.loadWind(ref).then(w => { if (w && App.route() === 'gps') { this.overlay(); this.advise(); } });
     this.layout();
@@ -366,6 +426,13 @@ const HoleView = {
       if (Math.hypot(dx, dy) > 10) return;   // a scroll, not a tap
       const h = this.info(); if (!h || !this.g) return;
       const t = this.fromScreen(p.x, p.y);
+      if (this.s.mode === 'bend') {
+        const mh = h.c.map.holes[h.n], line = (mh.line && mh.line.length >= 2 ? mh.line : [mh.tee, mh.green]).slice();
+        const q = CourseMap.pt(t), d = yardsBetween(mh.tee, q);
+        let k = 1; while (k < line.length - 1 && yardsBetween(mh.tee, line[k]) < d) k++;
+        line.splice(k, 0, q); mh.line = line; this.s.mode = 'aim'; this.s.target = undefined; Store.save(); App.render();
+        App.toast('Bend added: the line of play and yardages follow it'); return;
+      }
       if (this.s.mode === 'pin') {
         if (h.green && yardsBetween(t, h.green) > 45) { App.toast('Tap on the green to place the flag'); return; }
         this.setPin(t); App.render(); App.toast(`Flag set: ${Math.round(yardsBetween((this.ball(h) || {}).pos || t, t))} yds`); return;
@@ -547,9 +614,9 @@ Views.gps = function () {
   const bl = HoleView.ball(h), onTee = bl && (!bl.gps || (h.tee && yardsBetween(bl.pos, h.tee) < 40));
   const tipKey = h.c.id + ':' + h.n, tip = onTee && s.zoom !== 'green' && !s.tipHidden[tipKey] && s.mode !== 'pin' ? smartTip(h.c, h.n, h.pin, HoleView.cond(h.tee, h.flag)) : null;
   const lastShot = gps.lastShot && hlr ? hlr.holes.flatMap(x => x.shots || []).find(x => x.id === gps.lastShot) : null;
-  const mapped = h.green || h.tee;
+  const mapped = h.green && h.tee, setup = !mapped;
   const back = hlr ? '#/play' : '#/map';
-  let html = `<div class="hv" id="hvSlot"><div class="hv-over" id="hvOver"></div>
+  let html = `<div class="hv ${setup ? 'setup' : ''}" id="hvSlot"><div class="hv-over" id="hvOver"></div>
     <div class="hv-top">
       <a class="hv-back" href="${back}" aria-label="Back">‹</a>
       <div class="hv-card">
@@ -560,8 +627,8 @@ Views.gps = function () {
         <div class="hv-cell"><small>Hcp</small><strong>${h.si || '—'}</strong></div>
       </div>
     </div>
-    ${s.mode === 'pin' ? '<div class="hv-hint">Tap where the flag is on the green <button class="btn sm ghost" data-action="hvPinMode">Cancel</button></div>' : tip ? `<button class="hv-tip" data-action="hvTipHide" aria-label="Caddie tip, tap to hide">💡 ${escapeHtml(tip)}</button>` : ''}
-    ${mapped ? '' : `<div class="hv-empty card"><h3>Hole ${h.n} isn't mapped yet</h3><p class="small">Load the course's greens and hazards from OpenStreetMap, upload a map file, or set the tee and green yourself.</p><div class="btn-row"><button class="btn primary" data-action="hvImport">🗺 Find golf features</button><button class="btn" data-action="hvPlan">Map it myself</button></div></div>`}
+    ${setup ? '' : s.mode === 'bend' ? '<div class="hv-hint">Tap the corner of the dogleg, where the hole bends <button class="btn sm ghost" data-action="hvBendMode">Cancel</button></div>' : s.mode === 'pin' ? '<div class="hv-hint">Tap where the flag is on the green <button class="btn sm ghost" data-action="hvPinMode">Cancel</button></div>' : tip ? `<button class="hv-tip" data-action="hvTipHide" aria-label="Caddie tip, tap to hide">💡 ${escapeHtml(tip)}</button>` : ''}
+    ${setup ? setupHtml(h) : ''}
     <div class="hv-side">
       <button class="hv-round hv-wind" id="hvWind" data-action="hvSheet" data-v="tools" aria-label="Wind" hidden></button>
       <button class="hv-round ${h.pin ? 'on' : ''} ${s.mode === 'pin' ? 'active' : ''}" data-action="hvPinMode" aria-label="${h.pin ? 'Move the flag' : 'Set today’s flag position'}">⚑</button>
@@ -571,11 +638,12 @@ Views.gps = function () {
     </div>
     <div class="hv-bottom">
       ${lastShot && !gps.start ? `<button class="hv-lie" data-action="hvSheet" data-v="lie">Last shot: ${escapeHtml(lastShot.club || 'shot')} · ${Math.round(yardsBetween(lastShot.from, lastShot.to))} yds · <b>${SG.LIES.find(l => l[0] === lastShot.toLie)?.[1] || lastShot.toLie}</b> ✎</button>` : ''}
-      ${hlr ? '' : planStripHtml(h)}
+      ${hlr || setup ? '' : planStripHtml(h)}
       ${hlr ? `<button class="hv-track ${gps.start ? 'on' : ''}" id="hvTrack" data-action="${gps.start ? 'hvMeasure' : 'hvSheet'}" data-v="club">${gps.start ? `📏 Measure ${gps.club ? escapeHtml(gps.club) : 'shot'} <small>${App._lastPos ? Math.round(yardsBetween(gps.start, App._lastPos)) + ' yds so far' : 'walk to your ball'}</small>` : `📍 Track shot${gps.last != null ? ` <small>last: ${gps.last} yds${gps.lastClub ? ' ' + escapeHtml(gps.lastClub) : ''}${gps.lastLat != null && Math.abs(gps.lastLat) >= 2 ? ', ' + Math.abs(Math.round(gps.lastLat)) + (gps.lastLat > 0 ? ' R' : ' L') : ''}</small>` : ''}`}</button>` : ''}
       <div class="hv-row">
         ${hlr ? '<a class="hv-btn" href="#/play"><span>Scorecard</span><small>›</small></a>' : '<button class="hv-btn" data-action="hvPlan"><span>Planner</span><small>›</small></button>'}
         ${hlr ? `<button class="hv-score ${cur.strokes != null ? 'done' : ''}" data-action="hvSheet" data-v="score"><strong>Hole ${h.n}</strong><small>${cur.strokes != null ? `${cur.strokes} · ${scoreName(cur.strokes, h.par)}` : 'Enter score'}</small></button>`
+          : setup ? `<button class="hv-score" disabled><strong>Hole ${h.n}</strong><small>${h.tee ? 'tap the green' : 'tap the tee'}</small></button>`
           : (() => { const pc = mapped && HoleView.planClub(h); return `<button class="hv-score plan" data-action="hvAddShot" ${pc ? '' : 'disabled'}><strong>＋ ${pc ? escapeHtml(pc.club) : 'Add shot'}</strong><small>add to hole ${h.n} plan</small></button>`; })()}
         <button class="hv-next" data-action="hvHole" data-d="1" aria-label="Next hole" ${h.n >= (hlr ? (hlr.first || 0) + hlr.holes.length : h.holes) ? 'disabled' : ''}>›</button>
         <button class="hv-btn" data-action="hvSheet" data-v="tools"><span>Tools</span><small>›</small></button>
@@ -585,6 +653,22 @@ Views.gps = function () {
   </div>`;
   return html + sheetHtml;
 };
+
+/* Setting up an unmapped hole: find the course, then tap the tee and the green on the satellite image. */
+function setupHtml(h) {
+  const c = h.c;
+  if (!HoleView.setupCenter(h)) {
+    const res = App.ui.hvPlaces;
+    return `<div class="hv-setup card find"><h3>Where is ${escapeHtml(c.name)}?</h3><p class="small">Search for it to see the course on the satellite map. You only do this once.</p>
+      <form data-form="hvPlace" class="hv-search"><input name="q" aria-label="Course or town" value="${escapeHtml(App.ui.hvPlaceQ || [c.name, c.location].filter(Boolean).join(' '))}" required><button class="btn primary" type="submit">Search</button></form>
+      ${res ? (res.length ? `<ul class="hv-places">${res.map((r, i) => `<li><button data-action="hvPlacePick" data-i="${i}"><strong>${escapeHtml(r.name)}</strong><small>${escapeHtml(r.detail)}</small></button></li>`).join('')}</ul>` : '<p class="small muted">Nothing found. Try the course name with its town.</p>') : ''}
+      <button class="btn sm ghost mt" data-action="hvPlaceMe">📍 I'm at the course</button></div>`;
+  }
+  const none = !(c.map && Object.keys(c.map.holes || {}).length);
+  return `<div class="hv-setup"><div class="hv-setup-txt"><b>Hole ${h.n}${h.par ? ' · Par ' + h.par : ''}${h.yards ? ' · ' + h.yards + ' yds' : ''}</b>
+      <span>${h.tee ? '2 · Now tap the middle of the green' : '1 · Find this hole’s tee on the satellite image and tap it'}</span><small>Drag to move the map, pinch to zoom in.</small></div>
+    <div class="hv-setup-btns">${none ? '<button data-action="hvImport">Try auto-map</button>' : ''}${h.tee ? '<button data-action="hvRemap">Redo tee</button>' : ''}</div></div>`;
+}
 
 /* Planning away from the course: what's in this hole's plan, and how to change it. */
 function planStripHtml(h) {
@@ -653,6 +737,7 @@ function hvSheetHtml(sheet, h) {
   if (sheet === 'tools') {
     const dl = App.ui.dl, off = h.c.offline;
     return `${close}<h3>Tools</h3>${condLine(HoleView.cur())}${hvWindHtml()}
+      <div class="entry"><div class="entry-label">Hole map</div><div class="btn-row"><button class="btn sm" data-action="hvBendMode">↪ Mark a dogleg bend</button><button class="btn sm" data-action="hvRemap">↺ Re-mark tee &amp; green</button></div></div>
       <div class="entry"><div class="entry-label">Flag</div><div class="btn-row"><button class="btn sm" data-action="hvPinMode">⚑ ${h.pin ? 'Move' : 'Set'} today's flag</button><button class="btn sm" data-action="hvPinHere">📍 I'm at the flag</button>${h.pin ? '<button class="btn sm ghost danger" data-action="hvPinClear">Clear</button>' : ''}</div></div>
       <div class="entry"><div class="entry-label">Offline</div>
         ${dl && dl.running ? `<div class="progress"><span id="dlBar" style="width:${Math.round(100 * dl.done / Math.max(1, dl.total))}%"></span></div><p class="tiny muted mb0" id="dlText">Saving ${dl.done} of ${dl.total} map tiles…</p>`
@@ -727,6 +812,13 @@ Object.assign(Actions, {
       Store.save(); HoleView.s.key = null; App.render(); App.toast(`Loaded ${res.holes} holes and ${res.features} shapes`);
     } catch (e) { App.toast(navigator.onLine ? 'The map service is busy. Try again in a minute.' : 'You are offline.'); }
   },
+  hvBendMode() { const s = HoleView.s; s.mode = s.mode === 'bend' ? 'aim' : 'bend'; s.zoom = 'hole'; App.ui.hvSheet = null; App.render(); },
+  hvRemap() { const h = HoleView.info(); if (!h) return; HoleView.unmap(h); HoleView.s.from = null; HoleView.s.target = undefined; App.ui.hvSheet = null; App.render(); },
+  hvPlacePick(el) {
+    const r = (App.ui.hvPlaces || [])[+el.dataset.i], h = HoleView.info(); if (!r || !h) return;
+    h.c.geo = { lat: r.lat, lon: r.lon }; App.ui.hvPlaces = null; HoleView.s.setupView = null; Store.save(); App.render();
+  },
+  hvPlaceMe() { App.locate(p => { const h = HoleView.info(); if (!h) return; h.c.geo = CourseMap.pt(p); HoleView.s.setupView = null; Store.save(); App.render(); }); },
   hvGlance() { App.ui.hvGlance = !App.ui.hvGlance; App.ui.hvSheet = null; App.render(); },
   hvPinMode() { const s = HoleView.s; s.mode = s.mode === 'pin' ? 'aim' : 'pin'; if (s.mode === 'pin') s.zoom = 'green'; App.ui.hvSheet = null; App.render(); },
   hvPinHere() {
@@ -753,7 +845,8 @@ Object.assign(Actions, {
     App.ui.dl = null; App.render();
   },
   hvZoom() { HoleView.s.zoom = HoleView.s.zoom === 'green' ? 'hole' : 'green'; App.render(); },
-  hvLocate() { App.locate(p => { App._lastPos = p; App._lastPosAt = Date.now(); const h = HoleView.info(); if (h && !(HoleView.ball(h) || {}).gps) App.toast('You’re not on this hole, so distances are from the tee'); HoleView.s.target = undefined; HoleView.layout(); HoleView.overlay(); }); },
+  hvLocate() { App.locate(p => { App._lastPos = p; App._lastPosAt = Date.now(); const h = HoleView.info();
+    if (h && HoleView.needsSetup(h)) { HoleView.map.setView([p.lat, p.lon], 17); return; } if (h && !(HoleView.ball(h) || {}).gps) App.toast('You’re not on this hole, so distances are from the tee'); HoleView.s.target = undefined; HoleView.layout(); HoleView.overlay(); }); },
   hvClub(el) { HoleView.s.club = el.dataset.club; App.ui.hvSheet = null; App.render(); HoleView.afterMove(); },
   hvResetTarget() { HoleView.s.target = undefined; HoleView.s.club = null; App.ui.hvSheet = null; App.render(); },
   hvPlan() { const h = HoleView.info(); App.ui.plan = { courseId: HoleView.s.courseId, hole: h ? h.n : 1, startMode: h && (HoleView.ball(h) || {}).gps ? 'gps' : 'tee', fitted: null }; App.ui.hvSheet = null; location.hash = '#/map'; },
@@ -767,4 +860,17 @@ Object.assign(Actions, {
 
 Object.assign(Changes, {
   hvAutoHole(el) { App.state.settings.autoHole = el.checked; Store.save(); },
+});
+
+Object.assign(Forms, {
+  /* Find a course's location by name (OpenStreetMap's free place search). */
+  async hvPlace(form, v) {
+    const q = (v.q || '').trim(); if (q.length < 3) return;
+    App.ui.hvPlaceQ = q;
+    try {
+      const res = await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&q=' + encodeURIComponent(q), { headers: { Accept: 'application/json' } }).then(r => r.json());
+      App.ui.hvPlaces = (res || []).map(r => { const parts = String(r.display_name || '').split(', '); return { name: parts[0], detail: parts.slice(1, 4).join(', '), lat: +r.lat, lon: +r.lon }; });
+    } catch (e) { App.toast(navigator.onLine ? 'Place search is busy. Try again in a moment.' : 'You are offline.'); return; }
+    App.render();
+  },
 });
