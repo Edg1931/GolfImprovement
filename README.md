@@ -40,7 +40,7 @@ Without a key, the app still works: courses can be entered by hand and saved to 
 | Variable | What it enables |
 | --- | --- |
 | `GOLF_COURSE_API_KEY` | Course search and auto-fill ([golfcourseapi.com](https://golfcourseapi.com), free tier) |
-| `ANTHROPIC_API_KEY` | AI round summaries (Claude), for signed-in users, capped at 10 per person per day |
+| `ANTHROPIC_API_KEY` | Optional. Every round already gets a free built-in coach's debrief; with this key, signed-in users can also ask Claude for a deeper one (10 per person per day) |
 
 Accounts, sync and friends use Supabase; the public URL and publishable key are in `public/js/config.js` and every `golf_` table is protected by row-level security.
 

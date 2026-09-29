@@ -571,6 +571,7 @@ canvas.spark { width: 110px; height: 30px; display: block; }
 .ai-box.empty { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .ai-head { font-size: .72rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--gold); margin-bottom: 6px; }
 .ai-box p:last-child { margin-bottom: 0; }
+.ai-src { font-size: .6rem; padding: 1px 5px; border-radius: 4px; background: var(--gold); color: #fff; letter-spacing: .06em; vertical-align: 1px; }
 
 .yds-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 4px 0 10px; }
 .yds { display: flex; flex-direction: column; align-items: center; padding: 10px 4px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); }

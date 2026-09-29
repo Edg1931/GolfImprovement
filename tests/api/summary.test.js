@@ -12,7 +12,9 @@ global.fetch = async (url, o) => {
 };
 
 test('guards: method, key, sign-in, quota, size', async () => {
-  assert.equal((await call({ method: 'GET', headers: {} })).statusCode, 405);
+  assert.equal((await call({ method: 'PUT', headers: {} })).statusCode, 405);
+  delete process.env.ANTHROPIC_API_KEY; assert.deepEqual((await call({ method: 'GET', headers: {} })).body, { configured: false });
+  process.env.ANTHROPIC_API_KEY = 'sk-test'; assert.deepEqual((await call({ method: 'GET', headers: {} })).body, { configured: true });
   delete process.env.ANTHROPIC_API_KEY; assert.equal((await call(post('good'))).statusCode, 501);
   process.env.ANTHROPIC_API_KEY = 'sk-test';
   assert.equal((await call(post(null))).statusCode, 401);

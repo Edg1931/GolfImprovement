@@ -174,3 +174,23 @@ test('green yardages from saved pins @phone', async ({ page, context }) => {
   await expect(page.locator('.yds-num')).toHaveText(['150', '160', '170']);
   expect(errs).toEqual([]);
 });
+
+test('built-in coach writes a debrief with no account or AI key', async ({ page }) => {
+  const errs = trackErrors(page); await withDemo(page);
+  await page.goto('/#/rounds'); await page.click('[data-action=viewCard]');
+  const box = page.locator('.modal #aiBox');
+  await expect(box).toContainText("Coach's debrief");
+  await expect(box).toContainText('Where the strokes went');
+  await expect(box).toContainText('This week');
+  await expect(box.locator('[data-action=aiSummary]')).toHaveCount(0);   // no Claude key on the test server
+  // every drill named in the debrief is a real drill from the library
+  const text = await box.innerText();
+  const names = await page.evaluate(() => DRILLS.map(d => d.name));
+  const named = names.filter(n => text.includes(n));
+  expect(named.length).toBeGreaterThan(0);
+  // totals-only rounds open the debrief from the history table
+  await page.keyboard.press('Escape');
+  await page.locator('tr:has([data-action=editRound]) [data-action=aiSummary]').first().click();
+  await expect(page.locator('.modal #aiBox')).toContainText('This week');
+  expect(errs).toEqual([]);
+});

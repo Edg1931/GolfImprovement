@@ -37,6 +37,8 @@ async function takeQuota(token) {
 }
 
 async function handler(req, res) {
+  // GET tells the app whether the optional Claude debrief is switched on
+  if (req.method === 'GET') return json(res, 200, { configured: !!process.env.ANTHROPIC_API_KEY });
   if (req.method !== 'POST') return json(res, 405, { error: 'method_not_allowed' });
   if (!process.env.ANTHROPIC_API_KEY) return json(res, 501, { error: 'not_configured' });
   const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');

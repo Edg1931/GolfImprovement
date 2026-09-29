@@ -257,9 +257,13 @@ function scorecardTable(holes, pars, si, first) {
 }
 
 /* ---------- AI round summary ---------- */
+/* The debrief: Claude's version if one was written, otherwise the built-in coach (free, instant, offline). */
 function aiBox(r) {
-  if (r.aiSummary) return `<div class="ai-box" id="aiBox"><div class="ai-head">✨ Coach's debrief</div>${escapeHtml(r.aiSummary).split(/\n+/).map(p => `<p>${p}</p>`).join('')}</div>`;
-  return `<div class="ai-box empty" id="aiBox"><div><div class="ai-head">✨ Coach's debrief</div><p class="small muted mb0">A plain-English breakdown of where the strokes went and what to practise this week.${Cloud.user ? '' : ' Needs a free account.'}</p></div><button class="btn primary sm" data-action="aiSummary" data-id="${r.id}">Write it</button></div>`;
+  const paras = t => escapeHtml(t).split(/\n+/).map(p => `<p>${p}</p>`).join('');
+  if (r.aiSummary) return `<div class="ai-box" id="aiBox"><div class="ai-head">✨ Coach's debrief <span class="ai-src">AI</span></div>${paras(r.aiSummary)}</div>`;
+  let text; try { text = Coach.debrief(r); } catch (e) { console.warn('debrief', e); return ''; }
+  const canAsk = App.aiAvailable && Cloud.user;
+  return `<div class="ai-box" id="aiBox"><div class="ai-head">📋 Coach's debrief</div>${paras(text)}${canAsk ? `<div class="btn-row mt"><button class="btn sm" data-action="aiSummary" data-id="${r.id}">✨ Ask Claude for a deeper take</button></div>` : ''}</div>`;
 }
 
 /* What the coach sees: this round, the player's level and benchmark, and drills to choose from. */
