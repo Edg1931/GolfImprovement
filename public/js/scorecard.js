@@ -319,6 +319,7 @@ function roundCardModal(r) {
 Object.assign(Actions, {
   holeGo(el) { const lr = App.state.liveRound; const i = parseInt(el.dataset.i, 10); if (i < 0 || i >= lr.holes.length) return; lr.cur = i; Store.save(); App.render(); document.querySelector('.hole-card')?.scrollIntoView({ block: 'nearest' }); },
   holeSet(el) {
+    App.haptic();
     const lr = App.state.liveRound; const h = lr.holes[lr.cur]; const k = el.dataset.k;
     const v = k === 'fir' ? el.dataset.v : parseInt(el.dataset.v, 10);
     h[k] = h[k] === v && k !== 'strokes' && !(k === 'firstPutt' && h.fpAuto) ? null : v;
@@ -327,6 +328,7 @@ Object.assign(Actions, {
     Store.save(); App.render();
   },
   holeStep(el) {
+    App.haptic();
     const lr = App.state.liveRound; const h = lr.holes[lr.cur]; const k = el.dataset.k; const d = parseInt(el.dataset.d, 10);
     if (k === 'strokes') h.strokes = h.strokes == null ? lr.pars[lr.cur] : Math.max(1, Math.min(15, h.strokes + d));
     else h[k] = Math.max(0, Math.min(9, (h[k] || 0) + d));
@@ -536,4 +538,15 @@ Object.assign(Changes, {
   liveNotes(el) { if (App.state.liveRound) { App.state.liveRound.notes = el.value; Store.save(); } },
   playCourse(el) { App.ui.playCourse = el.value || null; App.ui.playHoles = null; App.render(); },
   roundCourse(el) { App.ui.roundCourse = el.value || null; App.render(); },
+});
+
+/* Phone: the More sheet and installing the app (the sheet's markup is in views.js). */
+Object.assign(Actions, {
+  moreSheet() {
+    const acct = Cloud.user ? `<a class="more-acct" href="#/account"><strong>${escapeHtml((Cloud.profile && Cloud.profile.display_name) || Cloud.user.email)}</strong><span class="sync-status ${Cloud.status}">${{ synced: 'Synced', syncing: 'Syncing…', offline: 'Offline', error: 'Sync problem' }[Cloud.status] || ''}</span></a>`
+      : '<a class="more-acct" href="#/account"><strong>Back up your data</strong><span class="small muted">Create a free account to sync your phone and computer</span></a>';
+    App.modal(`<div class="more-sheet"><h3>More</h3>${acct}${moreSheet()}</div>`);
+  },
+  async installApp() { const e = App._installEvt; if (!e) return; e.prompt(); try { await e.userChoice; } catch (x) { /* dismissed */ } App._installEvt = null; App.render(); },
+  installHide() { App.state.settings.installHidden = true; Store.save(); App.render(); },
 });

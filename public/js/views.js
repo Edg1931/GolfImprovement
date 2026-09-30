@@ -27,6 +27,26 @@ function lowDiff(rounds) { const d = rounds.map(r => r.diff).filter(x => x != nu
 function holesLabel(r) { return r.holesPlayed === 9 ? ` <span class="badge neutral" title="Nine-hole round">${r.nine === 'back' ? 'B9' : r.nine === 'front' ? 'F9' : '9'}</span>` : ''; }
 function drillLink(id) { const d = getDrill(id); return d ? `<a href="#" data-action="openDrill" data-id="${d.id}">${escapeHtml(d.name)}</a>` : escapeHtml(id); }
 function statBox(label, value, sub, cls) { return `<div class="stat ${cls || ''}"><span class="label">${label}</span><span class="value">${value}</span>${sub ? `<span class="sub">${sub}</span>` : ''}</div>`; }
+/* ---------- phone: the More sheet and the install card ---------- */
+const MORE = [
+  ['Progress', [['stats', 'i-chart', 'Stats'], ['rounds', 'i-card', 'Rounds'], ['goals', 'i-trophy', 'Goals']]],
+  ['Caddie', [['gameplan', 'i-flag', 'Game plan'], ['map', 'i-map', 'Course map'], ['finder', 'i-target', 'Rangefinder'], ['yardbook', 'i-book', 'Yardage book']]],
+  ['Practice', [['range', 'i-target', 'Range mode'], ['drills', 'i-drill', 'Drills'], ['sessions', 'i-pencil', 'Practice log'], ['assessment', 'i-target', 'Skills test'], ['playbook', 'i-book', 'Playbook']]],
+  ['You', [['clubs', 'i-bag', 'My clubs'], ['friends', 'i-users', 'Friends'], ['account', 'i-user', 'Account'], ['tools', 'i-tools', 'Tools']]],
+];
+function moreSheet() {
+  const r = App.route();
+  return MORE.map(([title, items]) => `<p class="more-title">${title}</p><div class="more-grid">${items.map(([route, ico, label]) => `<a class="more-tile ${r === route ? 'active' : ''}" href="#/${route}"><svg class="ico"><use href="#${ico}"/></svg><span>${label}</span></a>`).join('')}</div>`).join('');
+}
+function installCard() {
+  if (App.standalone() || App.state.settings.installHidden) return '';
+  const phone = window.matchMedia && matchMedia('(pointer: coarse)').matches;
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  if (App._installEvt) return `<div class="card install-card"><div><strong>Install Fairway Lab</strong><div class="small muted">Full screen, works offline, one tap from your home screen.</div></div><div class="btn-row"><button class="btn primary sm" data-action="installApp">Install</button><button class="btn ghost sm" data-action="installHide">Not now</button></div></div>`;
+  if (phone && ios) return `<div class="card install-card"><div><strong>Add it to your Home Screen</strong><div class="small muted">In Safari, tap <span class="share-ico" aria-label="Share">⬆︎</span> Share, then <strong>Add to Home Screen</strong>. It opens full screen and works offline.</div></div><button class="btn ghost sm" data-action="installHide">Got it</button></div>`;
+  return '';
+}
+
 function onboardingModal() {
   return `<div class="welcome"><img src="icons/icon.svg" alt="" width="56" height="56"><p class="eyebrow">Welcome to Fairway Lab</p><h2>Let's set up your game</h2>
     <p class="small muted">Thirty seconds now means your plan, targets and stats make sense from day one.</p></div>
@@ -75,6 +95,7 @@ Views.dashboard = function () {
   let html = `<div class="page-head"><div><h1>${greet}${p.name ? ', ' + escapeHtml(p.name) : ''}</h1><p class="muted">${dateStr}</p></div>
     <div class="btn-row"><a class="btn primary" href="#/play">Play a round</a><a class="btn" href="#/rounds">Log round</a><a class="btn" href="#/sessions">Log practice</a></div></div>`;
   if (lr) { const t = liveTotals(lr); html += `<a class="resume card" href="#/play"><span class="pulse" aria-hidden="true"></span><div><strong>Round in progress · ${escapeHtml(lr.course)}</strong><div class="small muted">Thru ${t.thru} · ${t.thru ? toPar(t.toPar) : 'E'}</div></div><span class="btn primary sm">Resume</span></a>`; }
+  html += installCard();
   if (!rounds.length) html += onboarding();
 
   // handicap: the number that matters, its target and its trend
@@ -576,3 +597,4 @@ Views.tools = function () {
     <div class="kv mt small"><dt>Rounds</dt><dd>${App.state.rounds.length}</dd><dt>Sessions</dt><dd>${App.state.sessions.length}</dd><dt>Skills tests</dt><dd>${App.state.assessments.length}</dd></div></div>`;
   return html;
 };
+

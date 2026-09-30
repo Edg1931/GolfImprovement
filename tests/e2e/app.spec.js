@@ -671,3 +671,29 @@ test('adding a course maps it and writes a game plan for every hole, before you 
   expect(await page.evaluate(() => App.state.courses.find(x => x.name === 'Seaside Links').plans[1][0].auto)).toBeFalsy();
   expect(errs).toEqual([]);
 });
+
+test('phone: bottom tabs, the More sheet, and Play going straight to the hole view during a round @phone', async ({ page, context }, info) => {
+  test.skip(info.project.name !== 'phone', 'phone layout only');
+  const errs = trackErrors(page); await mapFixtures(context); await withDemo(page);
+  await expect(page.locator('#menuBtn')).toBeHidden();
+  await expect(page.locator('.tabbar a, .tabbar button')).toHaveCount(5);
+  await page.click('.tabbar [data-action=moreSheet]');
+  await expect(page.locator('.more-tile')).toHaveCount(16);
+  await expect(page.locator('.more-acct')).toContainText('Back up your data');
+  await page.click('.more-tile:has-text("Stats")');
+  await expect(page.locator('#modalHost')).toHaveCount(0);
+  await expect(page.locator('h1')).toHaveText('Stats');
+  await expect(page.locator('.tabbar [data-action=moreSheet]')).toHaveClass(/active/);
+  // text boxes are 16px so iPhone doesn't zoom in
+  await page.goto('/#/play');
+  expect(await page.locator('input[name=q]').evaluate(el => getComputedStyle(el).fontSize)).toBe('16px');
+  // a round on a mapped course: Play opens the hole view
+  await page.evaluate(async json => { const c = App.state.courses.find(x => x.name === 'Home course'); CourseMap.apply(c, CourseMap.parseOSM(json), 'osm'); Store.save(); }, fx.json);
+  await page.goto('/#/play');
+  await page.selectOption('[data-change=playCourse]', { label: 'Home course · White' });
+  await page.click('form[data-form=startRound] button[type=submit]');
+  await expect(page.locator('#tabPlay')).toHaveAttribute('href', '#/gps');
+  await page.goto('/#/dashboard'); await page.click('#tabPlay');
+  await expect(page.locator('.hv-card')).toBeVisible();
+  expect(errs).toEqual([]);
+});

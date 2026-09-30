@@ -942,3 +942,48 @@ body.hv-mode .toast-host { bottom: calc(210px + var(--safe-b)); }
 .gp-exp.hard { color: var(--red); }
 .gp-exp.easy { color: var(--accent); }
 .focus-list.chances strong { color: var(--accent); }
+
+/* ---------- Phone app feel ---------- */
+button, .btn, .chip, .seg button, .tabbar a, .tabbar button { -webkit-user-select: none; user-select: none; }
+html { overscroll-behavior-y: none; }
+.tabbar button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--text-muted); background: none; border: 0; font: inherit; font-size: .68rem; font-weight: 600; cursor: pointer; }
+.tabbar button .ico { width: 22px; height: 22px; }
+.tabbar button.active { color: var(--accent); }
+.tab-play.live .tab-play-btn { background: var(--red); }
+@media (max-width: 900px) {
+  .menu-btn { display: none !important; }            /* the tab bar's More replaces the drawer */
+  .sidebar, .scrim { display: none !important; }
+  .brand { margin-left: 2px; }
+  /* iPhone zooms into text boxes smaller than 16px */
+  input:not([type=checkbox]):not([type=radio]), select, textarea { font-size: 16px !important; }
+  .btn { min-height: 42px; }
+  .btn.sm { min-height: 36px; padding: 7px 12px; }
+  .chip { min-height: 36px; padding: 7px 13px; }
+  .card { border-radius: 16px; }
+  .dash-index .stat-row { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .dash-index .stat .value { font-size: 1.5rem; }
+  .dash-index .stat:first-child .value { font-size: 2.2rem; }
+  .page-head { margin-bottom: 16px; }
+}
+/* press feedback on anything tappable */
+.btn:active, .chip:active, .round-list li:active, .gp-list li:active, .more-tile:active, .hole-pill:active, .seg button:active { transform: scale(.97); }
+.round-list li:active, .gp-list li:active { background: var(--surface-2); }
+.round-list li, .gp-list li { -webkit-tap-highlight-color: transparent; }
+/* bottom sheets get a grab handle */
+@media (max-width: 600px) {
+  .modal { padding-top: 26px; }
+  .modal::before { content: ""; position: absolute; top: 9px; left: 50%; width: 38px; height: 5px; margin-left: -19px; border-radius: 3px; background: var(--border-strong); }
+}
+.more-sheet h3 { margin-bottom: 4px; }
+.more-title { font-size: .78rem; font-weight: 600; color: var(--text-muted); margin: 14px 0 8px; }
+.more-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.more-tile { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 4px; border-radius: 14px; background: var(--surface-2); color: var(--text); font-size: .76rem; font-weight: 600; text-align: center; text-decoration: none; line-height: 1.2; }
+.more-tile:hover { text-decoration: none; }
+.more-tile .ico { width: 22px; height: 22px; color: var(--accent); }
+.more-tile.active { background: var(--accent-soft); }
+.install-card { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; background: var(--accent-soft); border-color: transparent; }
+.install-card .btn-row { flex-wrap: nowrap; }
+.install-card > .btn, .install-card .btn-row .btn { white-space: nowrap; flex-shrink: 0; }
+.share-ico { display: inline-block; padding: 0 3px; border-radius: 4px; background: var(--surface); font-size: .8em; }
+.more-acct { display: flex; flex-direction: column; gap: 2px; margin-top: 10px; padding: 12px 14px; border-radius: 14px; background: var(--surface-2); color: var(--text); text-decoration: none; }
+.more-acct:hover { text-decoration: none; }

@@ -8,7 +8,11 @@ const App = {
   init() {
     this.state = Store.load();
     this.applyTheme();
-    window.addEventListener('hashchange', () => this.render());
+    // picking a page from the More sheet closes it (other pop-ups, like the round summary, stay open)
+    window.addEventListener('hashchange', () => { if (document.querySelector('#modalHost .more-sheet')) this.closeModal(); this.render(); });
+    // phones: offer to install the app (Android asks the browser; iPhone gets instructions)
+    window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); this._installEvt = e; if (this.route() === 'dashboard') this.render(); });
+    window.addEventListener('appinstalled', () => { this._installEvt = null; this.render(); });
     document.addEventListener('click', e => this.onClick(e));
     document.addEventListener('submit', e => this.onSubmit(e));
     document.addEventListener('change', e => this.onChange(e));
@@ -110,6 +114,10 @@ const App = {
     document.querySelectorAll('[data-route]').forEach(a => { const on = a.dataset.route === route || (a.dataset.also || '').split(' ').includes(route); a.classList.toggle('active', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     const idx = this.index(); document.getElementById('topIndex').innerHTML = `<small>HI</small> ${idx != null ? fmt1(idx) : '—'}`;
     document.getElementById('liveDot').classList.toggle('hidden', !this.state.liveRound);
+    // during a round, the Play tab goes straight to the hole view
+    const tp = document.getElementById('tabPlay'), lr = this.state.liveRound;
+    const lc = lr && lr.courseId && this.state.courses.find(c => c.id === lr.courseId);
+    if (tp) { tp.href = lc && typeof AutoCaddie !== 'undefined' && AutoCaddie.mapped(lc) ? '#/gps' : '#/play'; tp.classList.toggle('live', !!lr); }
     document.getElementById('sidebarFoot').innerHTML = Cloud.user
       ? `<a class="acct-chip" href="#/account"><svg class="ico"><use href="#i-user"/></svg><span><strong>${escapeHtml((Cloud.profile && Cloud.profile.display_name) || Cloud.user.email)}</strong><span id="syncStatus" class="sync-status ${Cloud.status}"></span></span></a>`
       : `<p class="muted small mb0">Your data is only on this device. <a href="#/account">Create a free account</a> to back it up and sync.</p>`;
@@ -131,7 +139,7 @@ const App = {
   effectiveTheme() { return this.state.settings.theme || (this._darkQuery && this._darkQuery.matches ? 'dark' : 'light'); },
   applyTheme() {
     const t = this.effectiveTheme(); document.documentElement.setAttribute('data-theme', t);
-    const m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', t === 'dark' ? '#0c120e' : '#12352a');
+    const m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', t === 'dark' ? '#0e1110' : '#f6f6f2');
   },
   /* Keep the screen on while a live round is open (where supported). */
   keepAwake(on) {
@@ -160,6 +168,9 @@ const App = {
       e => this.toast(e.code === 1 ? 'Allow location access to measure shots' : 'Could not get a GPS fix. Try again in open sky.'),
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
   },
+  /* A light tap on phones that support it. */
+  haptic() { try { if (navigator.vibrate) navigator.vibrate(8); } catch (e) { /* not supported */ } },
+  standalone() { return (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true; },
   toggleMenu(force) { const open = force != null ? force : !document.getElementById('sidebar').classList.contains('open'); document.getElementById('sidebar').classList.toggle('open', open); document.getElementById('scrim').classList.toggle('open', open); },
   toast(msg) { const h = document.getElementById('toastHost'); while (h.children.length >= 3) h.firstChild.remove(); const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; h.appendChild(t); setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 250); }, 2600); },
   modal(html) { this.closeModal(); this._modalReturn = document.activeElement; const m = document.createElement('div'); m.className = 'modal-host'; m.id = 'modalHost'; m.innerHTML = `<div class="modal" role="dialog" aria-modal="true" tabindex="-1"><button class="btn sm ghost close" data-action="closeModal" aria-label="Close">✕</button>${html}</div>`; m.addEventListener('click', e => { if (e.target === m) this.closeModal(); }); document.body.appendChild(m); document.body.classList.add('modal-open'); m.querySelector('.modal').focus(); },

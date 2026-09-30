@@ -86,6 +86,7 @@ const Group = {
 
 Object.assign(Actions, {
   partnerStep(el) {
+    App.haptic();
     const lr = App.state.liveRound; if (!lr || !lr.players) return;
     const p = lr.players[+el.dataset.p]; if (!p) return; const i = lr.cur, d = +el.dataset.d;
     p.scores[i] = p.scores[i] == null ? lr.pars[i] : Math.max(1, Math.min(15, p.scores[i] + d));

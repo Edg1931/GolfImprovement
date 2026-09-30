@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Fairway Lab</title>
   <meta name="description" content="Track your handicap, score rounds hole by hole, follow structured practice schedules, run measurable drills and lower your scores." />
-  <meta name="theme-color" content="#12352a" />
+  <meta name="theme-color" content="#f6f6f2" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Fairway Lab" />
   <meta property="og:title" content="Fairway Lab — Golf Improvement Hub" />
   <meta property="og:description" content="Handicap tracking, a live scorecard, stroke-loss analysis and a 54-drill practice system." />
@@ -93,10 +93,10 @@
 
     <nav class="tabbar" aria-label="Quick navigation">
       <a href="#/dashboard" data-route="dashboard"><svg class="ico"><use href="#i-home"/></svg><span>Home</span></a>
-      <a href="#/plan" data-route="plan" data-also="sessions drills"><svg class="ico"><use href="#i-calendar"/></svg><span>Practice</span></a>
-      <a href="#/play" data-route="play" data-also="map gps finder yardbook gameplan" class="tab-play"><span class="tab-play-btn"><svg class="ico"><use href="#i-flag"/></svg></span><span>Play</span></a>
-      <a href="#/stats" data-route="stats" data-also="rounds shotmap"><svg class="ico"><use href="#i-chart"/></svg><span>Stats</span></a>
-      <a href="#/goals" data-route="goals" data-also="assessment playbook clubs tools friends account"><svg class="ico"><use href="#i-trophy"/></svg><span>Goals</span></a>
+      <a href="#/plan" data-route="plan" data-also="sessions drills range assessment playbook"><svg class="ico"><use href="#i-calendar"/></svg><span>Practice</span></a>
+      <a href="#/play" data-route="play" data-also="gps map finder" class="tab-play" id="tabPlay"><span class="tab-play-btn"><svg class="ico"><use href="#i-flag"/></svg></span><span>Play</span></a>
+      <a href="#/gameplan" data-route="gameplan" data-also="yardbook"><svg class="ico"><use href="#i-map"/></svg><span>Caddie</span></a>
+      <button type="button" data-action="moreSheet" data-route="more" data-also="stats rounds shotmap goals clubs friends account tools"><svg class="ico"><use href="#i-menu"/></svg><span>More</span></button>
     </nav>
   </div>
 
