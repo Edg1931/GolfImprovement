@@ -228,6 +228,7 @@ Views.stats = function () {
   </div>`;
 
   html += sgCard(rounds, n);
+  html += PlanReview.card(rounds, n);
   html += `<div class="card mt"><h2>Priority focus areas</h2>
     ${recs.length ? recs.map((r, i) => `<div class="rank"><div class="n ${['', 'two', 'three'][i]}">${i + 1}</div><div>
       <h3>${r.area.label} <span class="badge ${r.area.loss > 2 ? 'bad' : 'warn'}">≈ ${fmt1(r.area.loss)} strokes</span></h3>

@@ -149,7 +149,7 @@ function playSetup() {
     ${idx != null ? `<p class="tiny muted mb0">Your index ${fmt1(idx)} is used for net scoring and the net-double-bogey cap.${mode !== '18' ? ' Nine-hole scores count toward your index using the World Handicap System’s expected-score rule.' : ''}</p>` : `<p class="tiny muted mb0">No index yet: holes are capped at par + 5 until you have 3 rounds.${mode !== '18' ? ' Nine-hole rounds start counting once you have an index.' : ''}</p>`}
   </form></div></div>
   <div><div class="card"><div class="card-head"><h3>Course library</h3><span class="small muted">${courses.length}</span></div>
-      ${courses.length ? `<ul class="list compact">${courses.map(x => `<li class="row-between"><div><span class="tee-swatch" style="background:${teeColor(x.tees)}"></span> <strong>${escapeHtml(x.name)}</strong> <span class="small muted">${escapeHtml(x.tees || '')} · ${x.rating}/${x.slope} · par ${sum(x.pars)}${x.pars.length === 9 ? ' · 9 holes' : ''}</span></div><span class="nowrap"><button class="btn sm" data-action="openHoleView" data-id="${x.id}" data-hole="1" title="Plan your shots hole by hole">⛳ Plan</button><button class="btn sm" data-action="openCourseMap" data-id="${x.id}" title="Course map">🗺${x.map ? ' ✓' : ''}</button><button class="btn sm ghost danger" data-action="deleteCourse" data-id="${x.id}" aria-label="Delete course">✕</button></span></li>`).join('')}</ul>` : '<div class="empty small">Courses you find or enter are saved here, and they work offline.</div>'}
+      ${courses.length ? `<ul class="list compact">${courses.map(x => `<li class="row-between"><div><span class="tee-swatch" style="background:${teeColor(x.tees)}"></span> <strong>${escapeHtml(x.name)}</strong> <span class="small muted">${escapeHtml(x.tees || '')} · ${x.rating}/${x.slope} · par ${sum(x.pars)}${x.pars.length === 9 ? ' · 9 holes' : ''}</span></div><span class="nowrap"><button class="btn sm" data-action="openHoleView" data-id="${x.id}" data-hole="1" title="Plan your shots hole by hole">⛳ Plan</button><button class="btn sm" data-action="openYardbook" data-id="${x.id}" title="Yardage book">📖</button><button class="btn sm" data-action="openCourseMap" data-id="${x.id}" title="Course map">🗺${x.map ? ' ✓' : ''}</button><button class="btn sm ghost danger" data-action="deleteCourse" data-id="${x.id}" aria-label="Delete course">✕</button></span></li>`).join('')}</ul>` : '<div class="empty small">Courses you find or enter are saved here, and they work offline.</div>'}
     </div>
     <div class="card mt"><h3>Why score hole by hole?</h3><ul class="small tick-list">
     <li><strong>Correct handicap score.</strong> Every hole is capped at net double bogey automatically, as the World Handicap System requires.</li>
@@ -315,7 +315,7 @@ function roundCardModal(r) {
   return `<p class="eyebrow">${fmtDate(r.date)}</p><h2>${escapeHtml(r.course || 'Round')}</h2>
     <div class="stat-row mb">${statBox('Gross', r.grossScore ?? r.score, r.holesPlayed === 9 ? (r.nine === 'back' ? 'back nine' : 'front nine') : '')}${statBox('Adjusted', r.score, 'for handicap')}${statBox('Differential', fmt1(r.diff), r.holesPlayed === 9 ? '18-hole equivalent' : '')}${r.putts != null ? statBox('Putts', r.putts) : ''}</div>
     ${scorecardTable(r.holes, r.pars, r.si, r.firstHole)}
-    ${sgRoundHtml(r)}${Group.resultsHtml(r)}
+    ${sgRoundHtml(r)}${PlanReview.html(r)}${Group.resultsHtml(r)}
     ${s ? `<p class="small mt mb0">${s.dist.eagle + s.dist.birdie} birdies or better · ${s.dist.par} pars · ${s.dist.bogey} bogeys · ${s.dist.double + s.dist.triple} doubles+</p>` : ''}
     ${r.notes ? `<p class="small mt mb0"><strong>Notes:</strong> ${escapeHtml(r.notes)}</p>` : ''}
     ${aiBox(r)}
@@ -352,7 +352,9 @@ Object.assign(Actions, {
       sandAtt: st.sandAtt, sandMade: st.sandMade, threePutts: st.threePutts, doubles: st.doubles, notes: (lr.notes || '').trim(),
       ch: lr.ch, indexUsed: prevIdx, courseId: lr.courseId || null, mode: lr.mode, yards: lr.yards || null, siRank: lr.si.slice(),
       pins: lr.pins || null, players: Group.results(lr) };
-    SG.prepare(r, App.state.courses.find(c => c.id === lr.courseId));
+    const playedCourse = App.state.courses.find(c => c.id === lr.courseId);
+    r.plans = PlanReview.snapshot(playedCourse, lr);
+    SG.prepare(r, playedCourse);
     if (nine) { r.holesPlayed = 9; r.nine = lr.mode === 'back' ? 'back' : lr.mode === 'front' ? 'front' : null; r.firstHole = lr.first || 0; r.diff18 = nineHoleDifferential(r.score, r.rating, r.slope, prevIdx); }
     if (editing) App.state.rounds[App.state.rounds.indexOf(editing)] = r; else App.state.rounds.push(r);
     App.state.liveRound = null; App.ui.gps = null; App.keepAwake(false); Store.save();
@@ -364,7 +366,7 @@ Object.assign(Actions, {
       ${r.score !== r.grossScore ? `<div class="callout info small">Adjusted to <strong>${r.score}</strong> for handicap (holes capped at net double bogey).</div>` : ''}
       <div class="stat-row mb">${statBox('Differential', fmt1(r.diff))}${statBox('Index', idx != null ? fmt1(idx) : '—', prevIdx != null && idx != null && idx !== prevIdx ? (idx < prevIdx ? '▼ ' : '▲ ') + fmt1(Math.abs(idx - prevIdx)) : '')}${statBox('Putts', r.putts ?? '—')}${statBox('GIR', r.gir ?? '—')}</div>
       ${scorecardTable(r.holes, r.pars, r.si, r.firstHole)}
-      ${sgRoundHtml(r)}${Group.resultsHtml(r)}
+      ${sgRoundHtml(r)}${PlanReview.html(r)}${Group.resultsHtml(r)}
       ${aiBox(r)}
       <div class="btn-row mt"><button class="btn primary" data-action="closeModal">Done</button>${shotMapButton(r)}<button class="btn" data-action="shareRound" data-id="${r.id}">↗ Share</button><button class="btn" data-action="goto" data-href="#/stats">See stats</button></div>`);
     announceAchievements(before);

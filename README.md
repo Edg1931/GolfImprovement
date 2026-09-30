@@ -11,6 +11,10 @@ A complete, self-contained golf app for lowering your handicap. You can install 
 | **Hole GPS view** | Full-screen satellite view for the course, turned so the hole runs up the screen. Live yardage to the middle, front and back of the green; drag the target to see the distance to it and on to the green, with the club for each and your shot pattern drawn at the target. Track shots, enter your score and move between holes without leaving the map. |
 | **Plan from home** | Open any mapped course from the library (⛳ Plan) without starting a round: tap where you'd hit it, add the shot, and the next one starts from where it lands, until you reach the green. Drag the ball anywhere to check distances from there. Plans show on the map and the hole card when you play. |
 | **Map any course yourself** | Courses OpenStreetMap doesn't cover can be set up in the hole view from anywhere: search for the course by name, then on the satellite image tap each hole's tee and the middle of its green (and a dogleg bend if it has one). The view turns into the full hole map right away. |
+| **Rangefinder** | Map mode: tap anywhere for the GPS distance from you (or between two points) with plays-like from wind and slope. Camera mode: line up the top and bottom of the flagstick; the flag's known height gives the distance, and it can be calibrated once for your phone's lens. |
+| **Yardage book** | One printable page per mapped hole: carries over hazards, layup yardages, green depth, your shot plan and tee tip, with room for notes. Print, save as PDF or share as images. |
+| **Plan vs what happened** | After a round, each planned hole is compared with the shots tracked; when you changed club off the tee, the caddie simulation says what that choice cost or saved on average. Course-management summary on the Stats page. |
+| **Range mode** | Tap where each range ball finished on a target pad (or type it); shots feed your shot pattern at half weight and the session goes into the practice log. |
 | **On-course extras** | Flag position of the day (tap it, or stand at it), live wind and ground slope for plays-like yardages and crosswind aim, a strategy tip on each tee from your own miss pattern, automatic move to the next hole (and a score prompt when you walk off a green), a big-number glance mode, and a one-tap download of a course's imagery for offline play. |
 | **Strokes gained** | Tracked shots get their lie from the course map; with the first-putt distance (from GPS or one tap) each round splits into off the tee, approach, around the green and putting against your target handicap. Feeds the weekly practice plan. |
 | **Shot map** | Every tracked shot of a saved round on the hole map, coloured by strokes gained, with a shareable image of any hole. |
@@ -86,6 +90,10 @@ public/
   js/sg.js            strokes gained: baselines, shot lies, round and category totals
   js/group.js         playing partners, Stableford and skins
   js/shotmap.js       post-round shot map and share image
+  js/finder.js        rangefinder: GPS map and camera flagstick
+  js/yardbook.js      printable yardage book
+  js/planreview.js    plan vs what happened, course management
+  js/range.js         range mode
   api/courses.js      Vercel serverless course-search proxy
   sw.js               offline cache (service worker)
   manifest.webmanifest, icons/   installable-app metadata

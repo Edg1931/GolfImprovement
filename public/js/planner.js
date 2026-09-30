@@ -379,8 +379,8 @@ function dispersionCard() {
   const shots = (App.state.shotLog || []).filter(s => s.club === sel && s.lat != null);
   App.after(() => { const cv = document.getElementById('dispChart'); if (cv) drawDispersion(cv, m, shots); });
   const w = v => Math.round(v * 1.665);
-  return `<div class="card mt"><div class="card-head"><h2>Shot dispersion</h2><a class="small" href="#/map">Plan a hole ›</a></div>
-    <p class="small muted">Learned from GPS shots on the live scorecard. Until a club has 3 tracked shots, the pattern is estimated from your chart distance and handicap.</p>
+  return `<div class="card mt"><div class="card-head"><h2>Shot dispersion</h2><span class="nowrap"><a class="small" href="#/range">Range mode ›</a> · <a class="small" href="#/map">Plan a hole ›</a></span></div>
+    <p class="small muted">Learned from GPS shots on the live scorecard and from Range mode (range balls count half). Until a club has 3 tracked shots, the pattern is estimated from your chart distance and handicap.</p>
     <div class="chip-row mb">${models.map(x => `<button class="chip ${x.club === sel ? 'active' : ''}" data-action="dispClub" data-club="${escapeHtml(x.club)}">${escapeHtml(x.club)}${x.learned ? ' ✓' : ''}</button>`).join('')}</div>
     <div class="grid grid-2"><div><canvas id="dispChart" class="chart tall"></canvas></div>
     <div><div class="stat-row">${statBox('Typical', Math.round(m.along) + ' yds', m.n ? m.n + ' GPS shots' : 'estimate')}${statBox('Average miss', Math.abs(m.lat) < 1 ? 'Straight' : Math.abs(Math.round(m.lat)) + ' yds ' + (m.lat > 0 ? 'R' : 'L'), m.learned ? 'learned' : 'estimate')}${statBox('Width', '±' + w(m.latSD) + ' yds', '3 in 4 shots')}${statBox('Depth', '±' + w(m.alongSD) + ' yds', 'short / long')}</div>

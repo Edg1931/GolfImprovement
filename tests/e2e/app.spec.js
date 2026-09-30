@@ -519,3 +519,96 @@ test('map an unmapped course from home: find it, tap tee and green, add a dogleg
   expect(Math.abs(c.lat - fx.ll(0, 380).lat)).toBeLessThan(0.0005);
   expect(errs).toEqual([]);
 });
+
+/* ---------- rangefinder, range mode, yardage book, plan review ---------- */
+test('range mode: tap the pad or type shots, and the session lands in the practice log', async ({ page }) => {
+  const errs = trackErrors(page); await withDemo(page);
+  await page.goto('/#/range');
+  await page.click('[data-action=rangeClub][data-club="7i"]');
+  const box = await page.locator('#rangePad').boundingBox();
+  await page.mouse.click(box.x + box.width * 0.75, box.y + box.height * 0.5);   // right of the target, about the usual distance
+  await page.fill('.range-type [name=read]', '148'); await page.fill('.range-type [name=lat]', '-6'); await page.click('.range-type button[type=submit]');
+  const shots = await page.evaluate(() => App.state.shotLog.filter(s => s.source === 'range'));
+  expect(shots).toHaveLength(2); expect(shots[0].lat).toBeGreaterThan(10); expect(shots[1].read).toBe(148); expect(shots[1].along).toBeGreaterThan(148);
+  await expect(page.locator('.card', { hasText: 'This session' })).toContainText('7i');
+  await page.click('[data-action=rangeUndo]'); await page.fill('.range-type [name=read]', '148'); await page.fill('.range-type [name=lat]', '-6'); await page.click('.range-type button[type=submit]');
+  await page.click('[data-action=rangeFinish]');
+  await expect(page.locator('.toast').last()).toContainText('Range session saved: 2 balls');
+  const s = await page.evaluate(() => App.state.sessions.slice(-1)[0]);
+  expect(s.type).toBe('fullswing'); expect(s.notes).toContain('Range mode: 7i ×2');
+  expect(await page.evaluate(() => Caddie.bagModels(App.state.clubs, App.state.shotLog, App.index()).find(m => m.club === '7i').nRange)).toBe(2);
+  expect(errs).toEqual([]);
+});
+
+test('rangefinder: GPS distance to a tapped point, point to point, and the camera with calibration @phone', async ({ page, context }) => {
+  const errs = trackErrors(page); await mapFixtures(context); await weatherFixtures(context);
+  // a stand-in camera: a canvas stream
+  await context.addInitScript(() => {
+    navigator.mediaDevices.getUserMedia = async () => { const c = document.createElement('canvas'); c.width = 1280; c.height = 720; const x = c.getContext('2d'); setInterval(() => { x.fillStyle = '#3a6'; x.fillRect(0, 0, 1280, 720); }, 50); return c.captureStream(10); };
+  });
+  await withDemo(page);
+  await page.goto('/#/finder');
+  await expect(page.locator('#rfSlot .leaflet-container')).toBeVisible();
+  await page.waitForFunction(() => App._lastPos);
+  const tapMap = async q => { const p = await page.evaluate(q => { const cp = Finder.map.latLngToContainerPoint([q.lat, q.lon]); const r = Finder.el.getBoundingClientRect(); return { x: r.left + cp.x, y: r.top + cp.y }; }, q); await page.mouse.click(p.x, p.y); };
+  await page.click('[data-action=rfCenter]'); await page.waitForTimeout(200);
+  await tapMap(fx.ll(0, 150));
+  await expect(page.locator('#rfYds')).toHaveText(/^1(4[89]|5[0-2])yds$/);
+  await expect(page.locator('.rf-read')).toContainText('plays');   // into the wind and uphill in the fixtures
+  await page.click('[data-action=rfP2p][data-v="1"]');
+  await tapMap(fx.ll(0, 50)); await tapMap(fx.ll(0, 130));
+  await expect(page.locator('#rfYds')).toHaveText(/^(79|80|81)yds$/);
+  // camera
+  await page.click('[data-action=rfMode][data-v=camera]');
+  await page.click('[data-action=rfCamera]');
+  await page.waitForFunction(() => { const v = document.getElementById('rfVideo'); return v && v.videoWidth > 0; });
+  await expect(page.locator('#rfYds')).toHaveText(/^\d+yds$/);
+  // drag the top marker down: the flag looks smaller, so it's further away
+  const before = parseInt(await page.locator('#rfYds').textContent(), 10);
+  const top = await page.locator('[data-line=top]').boundingBox();
+  await page.mouse.move(top.x + top.width / 2, top.y + 1); await page.mouse.down(); await page.mouse.move(top.x + top.width / 2, top.y + 60, { steps: 4 }); await page.mouse.up();
+  const after = parseInt(await page.locator('#rfYds').textContent(), 10);
+  expect(after).toBeGreaterThan(before);
+  await page.click('[data-action=rfCalibrate]');
+  const known = String(Math.round(after * 1.25));   // a lens a bit longer than the default guess
+  await page.fill('[data-form=rfCal] [name=yards]', known); await page.click('[data-form=rfCal] button[type=submit]');
+  await expect(page.locator('#rfYds')).toHaveText(known + 'yds');
+  expect(await page.evaluate(() => App.state.settings.camK)).toBeGreaterThan(0.3);
+  expect(errs).toEqual([]);
+});
+
+test('yardage book pages and plan vs what happened', async ({ page, context }) => {
+  const errs = trackErrors(page); await mapFixtures(context); await weatherFixtures(context); await withDemo(page);
+  await page.evaluate(async ({ json, aim }) => {
+    const c = App.state.courses.find(x => x.name === 'Home course'); CourseMap.apply(c, CourseMap.parseOSM(json), 'osm');
+    const tee = CourseMap.holeInfo(c, 1).tee, green = CourseMap.holeInfo(c, 1).green;
+    c.plans = { 1: [{ club: '3W', start: tee, aim, land: aim, aimShift: 0, expected: null }, { club: '9i', start: aim, aim: green, land: green, aimShift: 0, expected: null }] };
+    Store.save();
+  }, { json: fx.json, aim: fx.ll(0, 225) });
+  // yardage book
+  await page.goto('/#/yardbook');
+  await expect(page.locator('.yb-page img')).toHaveCount(2);
+  await page.waitForFunction(() => [...document.querySelectorAll('.yb-page img')].every(i => i.src.startsWith('data:image/png')));
+  await expect(page.locator('.callout')).toContainText('16 holes aren’t mapped');
+  const dl = page.waitForEvent('download'); await page.click('[data-action=ybShare]');
+  expect((await dl).suggestedFilename()).toMatch(/Home-course-hole-\d\.png/);
+  // a round where the tee shot went off-plan: Driver instead of 3-wood
+  await page.goto('/#/play');
+  await page.selectOption('[data-change=playCourse]', { label: 'Home course · White' });
+  await page.click('form[data-form=startRound] button[type=submit]');
+  await page.evaluate(({ a, b, c }) => {
+    const lr = App.state.liveRound, course = App.state.courses.find(x => x.id === lr.courseId), flag = CourseMap.holeInfo(course, 1).green;
+    SG.record(lr, course, 1, 'Driver', a, b, flag); SG.record(lr, course, 1, '9i', b, c, flag);
+    lr.holes.forEach((h, i) => { h.strokes = lr.pars[i]; h.putts = 2; }); Store.save();
+  }, { a: fx.ll(0, 0), b: fx.ll(-8, 250), c: fx.ll(4, 371) });
+  await page.goto('/#/play'); await page.reload();
+  await page.click('[data-action=holeGo][data-i="17"]'); await page.click('[data-action=finishRound]');
+  const pc = page.locator('.modal .plan-check');
+  await expect(pc).toContainText('0 of 1');
+  await expect(pc).toContainText('Hole 1: planned 3W → 9i, played Driver → 9i');
+  const r = await page.evaluate(() => PlanReview.round(App.rounds()[0]));
+  expect(r.holes[0].cost).not.toBeNull();
+  await page.click('.modal [data-action=closeModal]');
+  await page.goto('/#/stats'); await expect(page.locator('.card', { hasText: 'Course management' })).toContainText('Stuck to the plan');
+  expect(errs).toEqual([]);
+});

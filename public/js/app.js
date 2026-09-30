@@ -101,9 +101,10 @@ const App = {
     this.afterHooks = [];
     const host = document.getElementById('view');
     const changed = route !== this._lastRoute; this._lastRoute = route;
-    if (route !== 'play' && route !== 'gps') { this.keepAwake(false); if (this.ui.liveYds) { this.ui.liveYds = false; this.watchGps(false); } }
+    if (route !== 'play' && route !== 'gps' && route !== 'finder') { this.keepAwake(false); if (this.ui.liveYds) { this.ui.liveYds = false; this.watchGps(false); } }
     if (route !== 'gps' && typeof HoleView !== 'undefined') { HoleView.leave(); this.ui.hvSheet = null; }
-    document.body.classList.toggle('hv-mode', route === 'gps');
+    if (route !== 'finder' && typeof Finder !== 'undefined') { Finder.stop(); if (Finder._watching) { Finder._watching = false; if (!this.ui.liveYds && route !== 'gps') this.watchGps(false); } }
+    document.body.classList.toggle('hv-mode', route === 'gps' || route === 'finder');
     if (!changed) host.classList.remove('enter');   // only animate real page changes, not in-page updates
     try { host.innerHTML = view(); } catch (e) { console.error(e); host.innerHTML = `<div class="callout warn">Something went wrong rendering this page: ${escapeHtml(e.message)}</div>`; }
     document.querySelectorAll('[data-route]').forEach(a => { const on = a.dataset.route === route || (a.dataset.also || '').split(' ').includes(route); a.classList.toggle('active', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
@@ -143,7 +144,7 @@ const App = {
   watchGps(on) {
     if (this._watchId != null) { navigator.geolocation.clearWatch(this._watchId); this._watchId = null; }
     if (!on || !navigator.geolocation) return;
-    this._watchId = navigator.geolocation.watchPosition(p => { this._lastPos = { lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy }; this._lastPosAt = Date.now(); updateGreenYards(); if (typeof HoleView !== 'undefined') HoleView.onPos(); },
+    this._watchId = navigator.geolocation.watchPosition(p => { this._lastPos = { lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy }; this._lastPosAt = Date.now(); updateGreenYards(); if (typeof HoleView !== 'undefined') HoleView.onPos(); if (typeof Finder !== 'undefined') Finder.onPos(); },
       e => {
         // only a refused permission is fatal; timeouts and lost signal are normal on a course, so keep watching
         if (e.code === 1) { this.toast('Allow location access for live yardage'); this.ui.liveYds = false; this.watchGps(false); this.render(); return; }

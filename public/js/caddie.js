@@ -77,20 +77,24 @@
     return { club, kind, along: carry * (1 + ROLL[kind]), alongSD: carry * (0.045 + h * 0.0018), lat: 0, latSD: carry * (0.05 + h * 0.0025) * WIDTH[kind], n: 0, nLat: 0 };
   }
   const PRIOR_WEIGHT = 4;   // the estimate counts like 4 shots, so real shots take over quickly
+  /* Blend the estimate with real shots ({v, w}: value and weight; range shots count half). */
   function blend(pm, psd, xs) {
-    const n = xs.length, k = PRIOR_WEIGHT;
-    if (!n) return { mean: pm, sd: psd };
-    const mean = (pm * k + xs.reduce((a, b) => a + b, 0)) / (k + n);
-    const ss = xs.reduce((s, x) => s + (x - mean) ** 2, 0) + k * (psd ** 2 + (pm - mean) ** 2);
-    return { mean, sd: Math.sqrt(ss / (k + n)) };
+    const k = PRIOR_WEIGHT, W = xs.reduce((s, x) => s + x.w, 0);
+    if (!xs.length) return { mean: pm, sd: psd };
+    const mean = (pm * k + xs.reduce((s, x) => s + x.w * x.v, 0)) / (k + W);
+    const ss = xs.reduce((s, x) => s + x.w * (x.v - mean) ** 2, 0) + k * (psd ** 2 + (pm - mean) ** 2);
+    return { mean, sd: Math.sqrt(ss / (k + W)) };
   }
-  /* Model for one club from its chart carry and logged shots ({along|yards, lat}). */
+  const RANGE_WEIGHT = 0.5;
+  /* Model for one club from its chart carry and logged shots ({along|yards, lat, source}). */
   function clubModel(club, carry, shots, index) {
     const p = prior(club, carry, index);
-    const along = shots.map(s => s.along != null ? s.along : s.yards).filter(v => v != null && isFinite(v));
-    const lat = shots.map(s => s.lat).filter(v => v != null && isFinite(v));
+    const w = s => (s.source === 'range' ? RANGE_WEIGHT : 1);
+    const along = shots.map(s => ({ v: s.along != null ? s.along : s.yards, w: w(s) })).filter(x => x.v != null && isFinite(x.v));
+    const lat = shots.map(s => ({ v: s.lat, w: w(s) })).filter(x => x.v != null && isFinite(x.v));
     const A = blend(p.along, p.alongSD, along), L = blend(0, p.latSD, lat);
-    return { club, kind: p.kind, carry, along: A.mean, alongSD: Math.max(3, A.sd), lat: L.mean, latSD: Math.max(3, L.sd), n: along.length, nLat: lat.length, learned: lat.length >= 3 };
+    const course = shots.filter(s => s.source !== 'range' && s.lat != null).length;
+    return { club, kind: p.kind, carry, along: A.mean, alongSD: Math.max(3, A.sd), lat: L.mean, latSD: Math.max(3, L.sd), n: along.length, nLat: lat.length, nCourse: course, nRange: lat.length - course, learned: lat.length >= 3 };
   }
   function bagModels(clubs, shotLog, index) {
     return clubs.filter(c => c.carry > 0).map(c => clubModel(c.club, c.carry, (shotLog || []).filter(s => s.club === c.club), index));
