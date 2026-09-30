@@ -137,7 +137,7 @@ function sgClass(v) { return v == null ? '' : v >= 0.1 ? 'sg-pos' : v <= -0.1 ? 
 function sgCard(rounds, n) {
   const hcp = App.targetHcp(), s = SG.summary(rounds, hcp, n);
   if (!s) return `<div class="card mt"><div class="card-head"><h2>Strokes gained</h2><span class="tag">GPS</span></div>
-    <p class="small mb0">Play a round on the <a href="#/play">live scorecard</a> at a mapped course and you'll see exactly where you gain and lose strokes against a ${hcp} handicap: off the tee, approach, around the green and putting. Tap in your first-putt distance on each green, and use <strong>Track shot</strong> for every shot to split the rest.</p></div>`;
+    <p class="small muted mb0">Track shots in the hole view at a mapped course to see where you gain and lose strokes.</p></div>`;
   const rows = SG.CATS.map(([k, label]) => [label, s[k]]).concat(s.other && Math.abs(s.other) >= 0.05 ? [['Untracked shots', s.other]] : []);
   const max = Math.max(1, ...rows.map(r => Math.abs(r[1])));
   return `<div class="card mt"><div class="card-head"><h2>Strokes gained</h2><span class="small muted">vs a ${hcp} handicap · average per round · ${s.rounds} round${s.rounds > 1 ? 's' : ''}, ${s.holes} holes measured</span></div>

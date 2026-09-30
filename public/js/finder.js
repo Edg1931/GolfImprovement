@@ -138,7 +138,7 @@ Views.finder = function () {
   const r = Finder.ui(), cam = r.mode === 'camera';
   App.after(() => { Finder._watching = true; if (App._watchId == null) App.watchGps(true); cam ? Finder.mountCamera() : Finder.mountMap(); });
   if (!cam) Finder.stop();
-  const tabs = `<div class="rf-tabs seg"><button class="${cam ? '' : 'active'}" data-action="rfMode" data-v="map">🛰 Map</button><button class="${cam ? 'active' : ''}" data-action="rfMode" data-v="camera">📷 Camera</button></div>`;
+  const tabs = `<div class="rf-tabs seg"><button class="${cam ? '' : 'active'}" data-action="rfMode" data-v="map">Map</button><button class="${cam ? 'active' : ''}" data-action="rfMode" data-v="camera">Camera</button></div>`;
   let body;
   if (!cam) body = `<div class="rf-bar"><div class="seg"><button class="${r.p2p ? '' : 'active'}" data-action="rfP2p" data-v="0">From me</button><button class="${r.p2p ? 'active' : ''}" data-action="rfP2p" data-v="1">Point to point</button></div><button class="hv-round" data-action="rfCenter" aria-label="Centre on me">◎</button></div>`;
   else if (!Finder.stream) body = `<div class="rf-start card"><h3>Camera rangefinder</h3><p class="small">Point your phone at the flag and slide the two markers to the top and bottom of the flagstick. It works out the distance from the flag's height.</p><button class="btn primary lg" data-action="rfCamera">Start camera</button><p class="tiny muted mt mb0">Accuracy is about ±10% until you calibrate it once (in the camera view). Beyond about 200 yds the flag gets too small to measure well.</p></div>`;

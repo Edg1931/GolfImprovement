@@ -145,7 +145,7 @@ const Planner = {
     let html = '';
     if (!mapped) html += `<div class="card"><h3>Load this course's map</h3>
       <p class="small">Greens, bunkers, water and fairways from OpenStreetMap, where volunteers have mapped the course.</p>
-      <div class="btn-row"><button class="btn primary" data-action="mapImportOSM">🗺 Find golf features</button><label class="btn" for="mapFile">⬆ Upload a map file</label></div>
+      <div class="btn-row"><button class="btn primary" data-action="mapImportOSM">Find golf features</button><label class="btn" for="mapFile">Upload a map file</label></div>
       <p class="tiny muted mt mb0">${c.geo ? 'Searches around the course location.' : 'Pan the map to the course first (or tap “My location” when you’re there), then search.'} Files: GeoJSON or KML from Google Earth. No data? Use the edit tools below to set tees and greens and draw hazards.</p></div>`;
     html += `<div class="card ${mapped ? '' : 'mt'}"><div class="card-head"><h3>Hole ${s.hole}${par ? ' · Par ' + par : ''}${yds ? ' · ' + yds + ' yds' : ''}</h3>${h.tee && h.green ? `<span class="small muted">${Math.round(yardsBetween(h.tee, h.green))} yds tee to green</span>` : ''}</div>
       <div class="seg mb">${[['tee', 'From the tee'], ['gps', 'From my ball'], ['start', 'Move ball']].map(([k, l]) => `<button class="${(k === 'start' ? s.mode === 'start' : s.startMode === k && s.mode !== 'start') ? 'active' : ''}" data-action="mapStart" data-v="${k}">${l}</button>`).join('')}</div>
@@ -170,7 +170,7 @@ const Planner = {
       <div class="btn-row"><button class="btn sm ${s.mode === 'tee' ? 'primary' : ''}" data-action="mapMode" data-v="tee">Set tee (tap)</button><button class="btn sm ${s.mode === 'green' ? 'primary' : ''}" data-action="mapMode" data-v="green">Set green centre (tap)</button></div>
       <div class="field mt"><label>Draw a shape</label><div class="btn-row"><select data-change="mapDrawType">${DRAW_TYPES.map(([k, l]) => `<option value="${k}" ${s.drawType === k ? 'selected' : ''}>${l}</option>`).join('')}</select>${s.mode === 'draw' ? `<button class="btn sm primary" data-action="mapDrawFinish" ${s.draw.length >= 3 ? '' : 'disabled'}>Finish (${s.draw.length} pts)</button><button class="btn sm" data-action="mapDrawUndo">Undo point</button><button class="btn sm ghost" data-action="mapMode" data-v="plan">Cancel</button>` : '<button class="btn sm" data-action="mapMode" data-v="draw">Start drawing</button>'}</div></div>
       ${s.mode === 'draw' ? '<p class="tiny muted">Tap around the edge of the shape, then Finish.</p>' : ''}
-      <div class="btn-row mt"><button class="btn sm" data-action="mapImportOSM">↻ Reload from OpenStreetMap</button><label class="btn sm" for="mapFile">⬆ Upload GeoJSON / KML</label><button class="btn sm ghost danger" data-action="mapUndoShape" ${(c.map && c.map.features.some(f => f.source === 'manual')) ? '' : 'disabled'}>Remove last drawn shape</button></div>
+      <div class="btn-row mt"><button class="btn sm" data-action="mapImportOSM">Reload from OpenStreetMap</button><label class="btn sm" for="mapFile">Upload GeoJSON / KML</label><button class="btn sm ghost danger" data-action="mapUndoShape" ${(c.map && c.map.features.some(f => f.source === 'manual')) ? '' : 'disabled'}>Remove last drawn shape</button></div>
       <p class="tiny muted mt mb0">${c.map ? `${c.map.features.length} shapes, ${Object.keys(c.map.holes).length} holes mapped${c.map.source ? ' · source: ' + (c.map.source === 'osm' ? 'OpenStreetMap' : c.map.source) : ''}.` : 'Nothing mapped yet.'}</p>
     </div></details>`;
     return html;
@@ -185,8 +185,8 @@ Views.map = function () {
   const c = Planner.course(); const n = c ? c.pars.length : 18;
   if (s.hole > n) s.hole = 1;
   App.after(() => { Planner.mount(); Planner.renderPanel(); });
-  return `<div class="page-head"><div><p class="eyebrow">Caddie</p><h1>Course map &amp; shot planner</h1><p class="muted">Tap where you want to hit it. Your caddie uses your real shot pattern to pick the club and the aim.</p></div>
-      <div class="btn-row"><button class="btn sm primary" data-action="openHoleView">🛰 Hole GPS view</button><button class="btn sm" data-action="mapMyLocation">📍 My location</button></div></div>
+  return `<div class="page-head"><div><h1>Course map</h1><p class="muted">Tap where you want to hit it. The caddie picks the club and the aim.</p></div>
+      <div class="btn-row"><button class="btn sm primary" data-action="openHoleView">Hole view</button><button class="btn sm" data-action="mapMyLocation">My location</button></div></div>
     ${courses.length ? `<div class="map-bar"><select data-change="mapCourse" aria-label="Course">${courses.map(x => `<option value="${x.id}" ${x.id === s.courseId ? 'selected' : ''}>${escapeHtml(x.name)}${x.tees ? ' · ' + escapeHtml(x.tees) : ''}</option>`).join('')}</select>
       <div class="hole-strip light">${[...Array(n)].map((_, k) => `<button class="hole-pill ${k + 1 === s.hole ? 'cur' : ''} ${c && c.map && c.map.holes[k + 1] ? 'mapped' : ''}" data-action="mapHole" data-h="${k + 1}"><small>${k + 1}</small>${c ? c.pars[k] : ''}</button>`).join('')}</div></div>`
       : `<div class="empty">Add a course first: search for it on the <a href="#/play">Play</a> page.</div>`}
@@ -280,12 +280,12 @@ function caddieHint(lr) {
 function caddieHintHtml(lr) {
   let h; try { h = caddieHint(lr); } catch (e) { console.warn('caddie', e); return ''; }
   const openBtn = (label) => `<button class="btn sm" data-action="openHoleMap">${label}</button>`;
-  if (!h) return lr.courseId ? `<div class="caddie-mini"><span class="small muted">Map this hole for club advice.</span>${openBtn('🗺 Map')}</div>` : '';
+  if (!h) return lr.courseId ? `<div class="caddie-mini"><span class="small muted">Map this hole for club advice.</span>${openBtn('Map')}</div>` : '';
   const plan = h.plan.length ? `<div class="tiny muted">Your plan: ${h.plan.map(p => escapeHtml(p.club)).join(' → ')}</div>` : '';
   const c = App.state.courses.find(x => x.id === lr.courseId);
   const tip = h.from === 'the tee' && c ? smartTip(c, h.holeNo, lr.pins && lr.pins[h.holeNo]) : null;
   return `<div class="caddie-mini"><div><div class="entry-label">Caddie · ${h.toGreen} yds to green from ${h.from}</div>
-    <strong>${escapeHtml(h.club)}</strong>${h.aimShift ? ` · aim ${Math.abs(h.aimShift)} yds ${h.aimShift < 0 ? 'left' : 'right'}` : ''}${h.mapped ? ` <span class="small muted">· ${h.reach ? Math.round(h.green * 100) + '% green' : 'leaves about ' + h.leaves + ' yds'}${h.trouble >= 0.05 ? ` · ${Math.round(h.trouble * 100)}% trouble` : ''}</span>` : ''}${plan}${tip ? `<div class="small caddie-tip">💡 ${escapeHtml(tip)}</div>` : ''}</div>${openBtn('🗺 Plan')}</div>`;
+    <strong>${escapeHtml(h.club)}</strong>${h.aimShift ? ` · aim ${Math.abs(h.aimShift)} yds ${h.aimShift < 0 ? 'left' : 'right'}` : ''}${h.mapped ? ` <span class="small muted">· ${h.reach ? Math.round(h.green * 100) + '% green' : 'leaves about ' + h.leaves + ' yds'}${h.trouble >= 0.05 ? ` · ${Math.round(h.trouble * 100)}% trouble` : ''}</span>` : ''}${plan}${tip ? `<div class="small caddie-tip">${escapeHtml(tip)}</div>` : ''}</div>${openBtn('Plan')}</div>`;
 }
 /* One line of strategy for the tee shot on a mapped hole, from the player's own miss pattern and where the
    trouble is: which club keeps it in play, and which side to favour. */
@@ -386,8 +386,8 @@ function dispersionCard() {
     <div><div class="stat-row">${statBox('Typical', Math.round(m.along) + ' yds', m.n ? m.n + ' GPS shots' : 'estimate')}${statBox('Average miss', Math.abs(m.lat) < 1 ? 'Straight' : Math.abs(Math.round(m.lat)) + ' yds ' + (m.lat > 0 ? 'R' : 'L'), m.learned ? 'learned' : 'estimate')}${statBox('Width', '±' + w(m.latSD) + ' yds', '3 in 4 shots')}${statBox('Depth', '±' + w(m.alongSD) + ' yds', 'short / long')}</div>
       <p class="small mt mb0">${m.learned ? (Math.abs(m.lat) >= 4 ? `Your ${escapeHtml(sel)} leaks ${m.lat > 0 ? 'right' : 'left'}: the caddie aims you ${Math.abs(Math.round(m.lat))} yds ${m.lat > 0 ? 'left' : 'right'} to compensate.` : `Your ${escapeHtml(sel)} is centred on your target. Good.`) : 'Track a few shots with this club on the course and this becomes your real pattern.'}</p></div></div>
     ${gappingHtml(models)}
-    <div class="table-wrap mt"><table><thead><tr><th>Club</th><th class="num">Shots</th><th class="num">Typical</th><th class="num">Avg miss</th><th class="num">Width</th><th></th></tr></thead><tbody>
-    ${models.map(x => `<tr><td><strong>${escapeHtml(x.club)}</strong></td><td class="num">${x.nLat}</td><td class="num">${Math.round(x.along)}</td><td class="num">${Math.abs(x.lat) < 1 ? '—' : Math.abs(Math.round(x.lat)) + (x.lat > 0 ? ' R' : ' L')}</td><td class="num">±${w(x.latSD)}</td><td>${x.learned ? '<span class="badge good">learned</span>' : '<span class="badge neutral">estimate</span>'}</td></tr>`).join('')}</tbody></table></div></div>`;
+    <details class="accordion mt"><summary>Every club</summary><div class="acc-body"><div class="table-wrap"><table><thead><tr><th>Club</th><th class="num">Shots</th><th class="num">Typical</th><th class="num">Avg miss</th><th class="num">Width</th><th></th></tr></thead><tbody>
+    ${models.map(x => `<tr><td><strong>${escapeHtml(x.club)}</strong></td><td class="num">${x.nLat}</td><td class="num">${Math.round(x.along)}</td><td class="num">${Math.abs(x.lat) < 1 ? '—' : Math.abs(Math.round(x.lat)) + (x.lat > 0 ? ' R' : ' L')}</td><td class="num">±${w(x.latSD)}</td><td>${x.learned ? '<span class="badge good">learned</span>' : '<span class="badge neutral">estimate</span>'}</td></tr>`).join('')}</tbody></table></div></div></details></div>`;
 }
 /* Gaps between clubs using on-course distances where they've been learned (chart distances otherwise). */
 function gappingHtml(models) {

@@ -91,7 +91,7 @@ const App = {
     const start = hist.length ? Math.max(...hist.map(h => h.index)) : idx;
     const total = start - p.targetIndex; const done = start - idx;
     const pc = total > 0 ? Math.max(0, Math.min(100, Math.round(100 * done / total))) : (idx <= p.targetIndex ? 100 : 0);
-    return `<div class="mt"><div class="small" style="display:flex;justify-content:space-between"><span>Started ${fmt1(start)}</span><span>${pc}% to target ${fmt1(p.targetIndex)}</span></div><div class="progress gold"><span style="width:${pc}%"></span></div></div>`;
+    return `<div class="mt"><div class="progress"><span style="width:${pc}%"></span></div><div class="tiny muted mt-xs" style="display:flex;justify-content:space-between"><span>From ${fmt1(start)}</span><span>${pc}% of the way</span></div></div>`;
   },
 
   /* ---------- rendering ---------- */

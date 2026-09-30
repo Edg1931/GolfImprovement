@@ -85,8 +85,7 @@ function courseSearchCard() {
       <button class="course-hit" data-action="courseOpen" data-i="${ci}"><div><strong>${escapeHtml(c.name)}</strong><div class="tiny muted">${escapeHtml([c.city, c.state, c.country].filter(Boolean).join(', '))}${(c.teeCount ?? c.tees.length) ? ` · ${c.teeCount ?? c.tees.length} tee${(c.teeCount ?? c.tees.length) === 1 ? '' : 's'}` : ''}</div></div><span class="chev" aria-hidden="true"></span></button>
       ${cs.open === ci ? `<div class="tee-list">${c.loading ? '<p class="small muted"><span class="spinner"></span> Loading scorecard…</p>' : c.error ? `<p class="small">${escapeHtml(c.error)}</p>` : c.tees.length ? c.tees.map((t, ti) => `<button class="tee-opt" data-action="importTee" data-c="${ci}" data-t="${ti}"><span class="tee-swatch" style="background:${teeColor(t.name)}"></span><span><strong>${escapeHtml(t.name)}</strong>${t.gender === 'F' ? ' <span class="tiny muted">(W)</span>' : ''}<span class="tiny muted"> · ${t.rating ?? '—'}/${t.slope ?? '—'} · par ${t.par ?? sum(t.holes.map(h => h.par))}${t.yards ? ' · ' + t.yards + ' yds' : ''}${t.holes.length === 9 ? ' · 9 holes' : ''}</span></span><span class="btn sm primary">Use</span></button>`).join('') : '<p class="small muted">No scorecard data for this course.</p>'}</div>` : ''}
     </li>`).join('')}</ul>`;
-  return `<div class="card"><div class="card-head"><h2>Step 2 · Find your course</h2><span class="tag">Auto-fill</span></div>
-    <p class="small muted">Search any course: rating, slope, par, stroke index and yardages fill in automatically.</p>
+  return `<div class="card"><div class="card-head"><h2>Find your course</h2></div>
     <form class="search-row" data-form="courseSearch"><input type="search" name="q" value="${escapeHtml(cs.q || '')}" placeholder="Course or club name, e.g. Pebble Beach" aria-label="Search courses" minlength="3" required><button class="btn primary" type="submit">Search</button></form>
     ${body}</div>`;
 }
@@ -112,8 +111,8 @@ function playSetup() {
   const nineOnly = c.pars.length === 9;
   let mode = App.ui.playHoles || '18'; if (nineOnly) mode = 'nine'; else if (mode === 'nine') mode = '18';
   const idx = App.index();
-  let html = `<div class="page-head"><div><p class="eyebrow">Live scorecard</p><h1>Play a round</h1><p class="muted">Choose 9 or 18, find your course, and tap in each hole. Fairways, greens, scrambling and your handicap-adjusted score are worked out for you.</p></div></div>`;
-  html += `<div class="card holes-pick"><div class="entry-label">Step 1 · How many holes today?</div>
+  let html = `<div class="page-head"><div><h1>Play a round</h1><p class="muted">Pick 9 or 18, choose your course, and score each hole.</p></div></div>`;
+  html += `<div class="card holes-pick"><div class="entry-label">Holes</div>
     <div class="holes-tiles">
       <button type="button" class="holes-tile ${mode === '18' ? 'active' : ''}" data-action="playHoles" data-v="18" ${nineOnly ? 'disabled' : ''}><span class="holes-num">18</span><span>Full round</span></button>
       <button type="button" class="holes-tile ${mode !== '18' ? 'active' : ''}" data-action="playHoles" data-v="${mode === 'back' ? 'back' : 'front'}"><span class="holes-num">9</span><span>Quick nine</span></button>
@@ -123,7 +122,7 @@ function playSetup() {
     ${mode !== '18' ? '<p class="tiny muted mt mb0">Nine-hole scores count toward your handicap using the official expected-score rule.</p>' : ''}
   </div>
   <div class="grid grid-2 mt"><div>${courseSearchCard()}
-  <div class="card mt"><h2>Step 3 · Tee it up</h2><form class="form" data-form="startRound">
+  <div class="card mt"><h2>Tee it up</h2><form class="form" data-form="startRound">
     ${courses.length ? `<div class="field"><label>Course</label><select data-change="playCourse"><option value="">Enter a course by hand…</option>${courses.map(x => `<option value="${x.id}" ${sel && sel.id === x.id ? 'selected' : ''}>${escapeHtml(x.name)}${x.tees ? ' · ' + escapeHtml(x.tees) : ''}${x.pars.length === 9 ? ' (9 holes)' : ''}</option>`).join('')}</select></div>` : ''}
     ${sel ? `<div class="course-summary"><span class="tee-swatch lg" style="background:${teeColor(sel.tees)}"></span><div><strong>${escapeHtml(sel.name)}</strong><div class="small muted">${escapeHtml(sel.tees || 'Tees')} · rating ${sel.rating ?? '—'} · slope ${sel.slope ?? '—'} · par ${sum(sel.pars)}${sel.yards ? ' · ' + sum(sel.yards) + ' yds' : ''}</div></div></div>` : ''}
     <input type="hidden" name="holesMode" value="${mode}">
@@ -149,13 +148,8 @@ function playSetup() {
     ${idx != null ? `<p class="tiny muted mb0">Your index ${fmt1(idx)} is used for net scoring and the net-double-bogey cap.${mode !== '18' ? ' Nine-hole scores count toward your index using the World Handicap System’s expected-score rule.' : ''}</p>` : `<p class="tiny muted mb0">No index yet: holes are capped at par + 5 until you have 3 rounds.${mode !== '18' ? ' Nine-hole rounds start counting once you have an index.' : ''}</p>`}
   </form></div></div>
   <div><div class="card"><div class="card-head"><h3>Course library</h3><span class="small muted">${courses.length}</span></div>
-      ${courses.length ? `<ul class="list compact">${courses.map(x => `<li class="row-between"><div><span class="tee-swatch" style="background:${teeColor(x.tees)}"></span> <strong>${escapeHtml(x.name)}</strong> <span class="small muted">${escapeHtml(x.tees || '')} · ${x.rating}/${x.slope} · par ${sum(x.pars)}${x.pars.length === 9 ? ' · 9 holes' : ''}</span></div><span class="nowrap"><button class="btn sm" data-action="openHoleView" data-id="${x.id}" data-hole="1" title="Plan your shots hole by hole">⛳ Plan</button><button class="btn sm" data-action="openYardbook" data-id="${x.id}" title="Yardage book">📖</button><button class="btn sm" data-action="openCourseMap" data-id="${x.id}" title="Course map">🗺${x.map ? ' ✓' : ''}</button><button class="btn sm ghost danger" data-action="deleteCourse" data-id="${x.id}" aria-label="Delete course">✕</button></span></li>`).join('')}</ul>` : '<div class="empty small">Courses you find or enter are saved here, and they work offline.</div>'}
+      ${courses.length ? `<ul class="list compact">${courses.map(x => `<li class="row-between"><div><span class="tee-swatch" style="background:${teeColor(x.tees)}"></span> <strong>${escapeHtml(x.name)}</strong> <span class="small muted">${escapeHtml(x.tees || '')} · ${x.rating}/${x.slope} · par ${sum(x.pars)}${x.pars.length === 9 ? ' · 9 holes' : ''}</span></div><span class="nowrap"><button class="btn sm" data-action="openHoleView" data-id="${x.id}" data-hole="1" title="Plan your shots hole by hole">Plan</button><button class="btn sm ghost" data-action="openYardbook" data-id="${x.id}" title="Yardage book">Book</button><button class="btn sm ghost" data-action="openCourseMap" data-id="${x.id}" title="Course map">Map</button><button class="btn sm ghost danger" data-action="deleteCourse" data-id="${x.id}" aria-label="Delete course">✕</button></span></li>`).join('')}</ul>` : '<div class="empty small">Courses you find or enter are saved here, and they work offline.</div>'}
     </div>
-    <div class="card mt"><h3>Why score hole by hole?</h3><ul class="small tick-list">
-    <li><strong>Correct handicap score.</strong> Every hole is capped at net double bogey automatically, as the World Handicap System requires.</li>
-    <li><strong>Nine holes count too.</strong> A front or back nine becomes an 18-hole differential using the official expected-score rule.</li>
-    <li><strong>Deeper stats.</strong> Birdie/par/bogey mix, par-3/4/5 scoring, front vs back nine and which side you miss fairways.</li>
-    <li><strong>GPS shot distance.</strong> Mark your ball, walk to it, see the yardage.</li></ul></div>
   </div></div>`;
   return html;
 }
@@ -182,7 +176,7 @@ function playLive(lr) {
   const quick = [-1, 0, 1, 2, 3].map(d => par + d).filter(v => v > 0);
   html += `<div class="grid grid-2 mt"><div class="card hole-card">
     <div class="row-between"><div><p class="eyebrow">Hole ${no(i)}${n === 9 ? ` · ${i + 1} of 9` : ' of 18'}</p><h2 class="hole-title">Par ${par} <span class="muted">· ${lr.yards && lr.yards[i] ? lr.yards[i] + ' yds · ' : ''}SI ${cardSi[i]}</span></h2></div>${rec > 0 ? `<span class="badge">${'●'.repeat(Math.min(rec, 3))} ${rec} stroke${rec > 1 ? 's' : ''}</span>` : ''}</div>
-    ${lr.courseId ? '<button class="btn primary block hv-open" data-action="openHoleView">🛰 Hole GPS view</button>' : ''}
+    ${lr.courseId ? '<button class="btn primary block hv-open" data-action="openHoleView">Open hole view</button>' : ''}
 
     ${caddieHintHtml(lr)}
     <div class="entry"><div class="entry-label">Score</div>
@@ -206,13 +200,12 @@ function playLive(lr) {
   </div>
 
   <div>${greenCard(lr, first + i)}${Group.card(lr)}
-    <div class="card mt"><div class="card-head"><h3>Shot distance</h3><span class="tag">GPS</span></div>
-      <p class="small muted">Pick the club, tap <em>Mark</em> where you hit from, walk to your ball, then tap <em>Measure</em>. Shots build your real distances in My Clubs.</p>
+    <div class="card mt"><div class="card-head"><h3>Shot distance</h3></div>
+      <p class="small muted">Pick a club, <em>Mark</em> where you hit from, then <em>Measure</em> at your ball.</p>
       <div class="field mb"><label>Club</label><select data-change="gpsClub"><option value="">Not recorded</option>${App.state.clubs.map(c => `<option ${gps.club === c.club ? 'selected' : ''}>${escapeHtml(c.club)}</option>`).join('')}</select></div>
       <div class="gps-read">${gps.last != null ? `<span class="big">${gps.last}</span> yds${gps.lastClub ? ' <span class="muted">· ' + escapeHtml(gps.lastClub) + '</span>' : ''}${gps.lastLat != null ? ` <span class="badge neutral">${Math.abs(gps.lastLat) < 2 ? 'on line' : Math.abs(Math.round(gps.lastLat)) + ' yds ' + (gps.lastLat > 0 ? 'right' : 'left')}</span>` : ''}` : gps.start ? '<span class="muted">Marked. Walk to your ball…</span>' : '<span class="muted">—</span>'}</div>
-      <div class="btn-row"><button class="btn primary" data-action="gpsMark">📍 Mark</button><button class="btn" data-action="gpsMeasure" ${gps.start ? '' : 'disabled'}>📏 Measure</button></div>
-      ${gps.shots && gps.shots.length ? `<p class="small mt mb0">This round: ${gps.shots.slice(-6).map(s => `<span class="badge neutral">${s.club ? escapeHtml(s.club) + ' ' : ''}${s.yards} yds</span>`).join(' ')}</p>` : ''}
-      <p class="tiny muted mt mb0">Phone GPS is accurate to about 3–5 yds in open sky. Measured distance includes roll.</p></div>
+      <div class="btn-row"><button class="btn primary" data-action="gpsMark">Mark</button><button class="btn" data-action="gpsMeasure" ${gps.start ? '' : 'disabled'}>Measure</button></div>
+      ${gps.shots && gps.shots.length ? `<p class="small mt mb0">This round: ${gps.shots.slice(-6).map(s => `<span class="badge neutral">${s.club ? escapeHtml(s.club) + ' ' : ''}${s.yards} yds</span>`).join(' ')}</p>` : ''}</div>
     <div class="card mt"><h3>Scorecard</h3>${scorecardTable(lr.holes, lr.pars, cardSi, first)}</div>
     <div class="card mt"><h3>Round notes</h3><textarea class="notes-box" rows="3" data-change="liveNotes" placeholder="Conditions, what worked, what cost you strokes…">${escapeHtml(lr.notes || '')}</textarea></div>
     ${lr.editingId ? '' : '<div class="btn-row mt"><button class="btn ghost danger sm" data-action="discardRound">Discard round</button></div>'}
@@ -224,11 +217,11 @@ function playLive(lr) {
 function greenCard(lr, hole) {
   const course = lr.courseId && App.state.courses.find(c => c.id === lr.courseId);
   const g = course && course.greens && course.greens[hole];
-  if (!course) return `<div class="card"><div class="card-head"><h3>Green yardages</h3><span class="tag">GPS</span></div><p class="small muted mb0">Save the course to your library to record greens and get front, middle and back yardages.</p></div>`;
+  if (!course) return `<div class="card"><div class="card-head"><h3>Green yardages</h3></div><p class="small muted mb0">Save the course to your library to record greens.</p></div>`;
   const spots = [['front', 'Front'], ['center', 'Middle'], ['back', 'Back']];
   const pinBtns = spots.map(([k, l]) => `<button class="btn sm ${g && g[k] ? '' : 'primary'}" data-action="greenPin" data-hole="${hole}" data-spot="${k}">${g && g[k] ? '✓ ' : ''}${l}</button>`).join('');
-  if (!g || !g.center) return `<div class="card"><div class="card-head"><h3>Green yardages</h3><span class="tag">GPS</span></div>
-    <p class="small">No green saved for hole ${hole + 1} yet. When you reach the green, stand on the ${g && (g.front || g.back) ? 'middle' : 'front edge, middle and back edge'} and tap the matching button. You only do this once per course.</p>
+  if (!g || !g.center) return `<div class="card"><div class="card-head"><h3>Green yardages</h3></div>
+    <p class="small muted">On the green, stand at the ${g && (g.front || g.back) ? 'middle' : 'front, middle and back'} and tap each. Once per course.</p>
     <div class="btn-row">${pinBtns}</div></div>`;
   App.after(() => updateGreenYards());
   return `<div class="card green-card"><div class="card-head"><h3>Green · hole ${hole + 1}</h3><button class="btn sm ${App.ui.liveYds ? 'primary' : ''}" data-action="liveYardage">${App.ui.liveYds ? '● Live' : 'Start live yardage'}</button></div>
@@ -275,7 +268,7 @@ function aiBox(r) {
   if (r.aiSummary) return `<div class="ai-box" id="aiBox"><div class="ai-head">✨ Coach's debrief <span class="ai-src">AI</span></div>${paras(r.aiSummary)}</div>`;
   let text; try { text = Coach.debrief(r); } catch (e) { console.warn('debrief', e); return ''; }
   const canAsk = App.aiAvailable && Cloud.user;
-  return `<div class="ai-box" id="aiBox"><div class="ai-head">📋 Coach's debrief</div>${paras(text)}${canAsk ? `<div class="btn-row mt"><button class="btn sm" data-action="aiSummary" data-id="${r.id}">✨ Ask Claude for a deeper take</button></div>` : ''}</div>`;
+  return `<div class="ai-box" id="aiBox"><div class="ai-head">Coach's debrief</div>${paras(text)}${canAsk ? `<div class="btn-row mt"><button class="btn sm" data-action="aiSummary" data-id="${r.id}">✨ Ask Claude for a deeper take</button></div>` : ''}</div>`;
 }
 
 /* What the coach sees: this round, the player's level and benchmark, and drills to choose from. */
@@ -319,7 +312,7 @@ function roundCardModal(r) {
     ${s ? `<p class="small mt mb0">${s.dist.eagle + s.dist.birdie} birdies or better · ${s.dist.par} pars · ${s.dist.bogey} bogeys · ${s.dist.double + s.dist.triple} doubles+</p>` : ''}
     ${r.notes ? `<p class="small mt mb0"><strong>Notes:</strong> ${escapeHtml(r.notes)}</p>` : ''}
     ${aiBox(r)}
-    <div class="btn-row mt"><button class="btn" data-action="shareRound" data-id="${r.id}">↗ Share</button>${shotMapButton(r)}<button class="btn" data-action="editRound" data-id="${r.id}">✎ Edit round</button></div>`;
+    <div class="btn-row mt"><button class="btn" data-action="shareRound" data-id="${r.id}">Share</button>${shotMapButton(r)}<button class="btn" data-action="editRound" data-id="${r.id}">✎ Edit round</button></div>`;
 }
 
 /* ---------- Actions for the scorecard ---------- */
@@ -368,7 +361,7 @@ Object.assign(Actions, {
       ${scorecardTable(r.holes, r.pars, r.si, r.firstHole)}
       ${sgRoundHtml(r)}${PlanReview.html(r)}${Group.resultsHtml(r)}
       ${aiBox(r)}
-      <div class="btn-row mt"><button class="btn primary" data-action="closeModal">Done</button>${shotMapButton(r)}<button class="btn" data-action="shareRound" data-id="${r.id}">↗ Share</button><button class="btn" data-action="goto" data-href="#/stats">See stats</button></div>`);
+      <div class="btn-row mt"><button class="btn primary" data-action="closeModal">Done</button>${shotMapButton(r)}<button class="btn" data-action="shareRound" data-id="${r.id}">Share</button><button class="btn" data-action="goto" data-href="#/stats">See stats</button></div>`);
     announceAchievements(before);
   },
   /* Reopen a saved round: hole-by-hole rounds go back into the scorecard, quick-logged ones get a form. */

@@ -75,7 +75,7 @@ Views.range = function () {
   });
   const seg = (k, opts) => `<div class="seg">${opts.map(([v, l]) => `<button class="${String(r[k]) === String(v) ? 'active' : ''}" data-action="rangeSet" data-k="${k}" data-v="${v}">${l}</button>`).join('')}</div>`;
   const shots = Range.session(r);
-  return `<div class="page-head"><div><p class="eyebrow">Practice</p><h1>Range mode</h1><p class="muted">Pick a club, hit, and tap where the ball finished: distance up the pad, left or right across it. Your shot pattern (and the caddie) learns from every ball.</p></div></div>
+  return `<div class="page-head"><div><h1>Range mode</h1><p class="muted">Pick a club, hit, and tap where the ball finished.</p></div></div>
   <div class="grid grid-2">
     <div class="card"><div class="chip-row mb">${App.state.clubs.map(c => `<button class="chip ${r.club === c.club ? 'active' : ''}" data-action="rangeClub" data-club="${escapeHtml(c.club)}">${escapeHtml(c.club)}</button>`).join('')}</div>
       <div class="form-row range-opts"><div class="field"><label>I'm reading</label>${seg('unit', [['carry', 'Carry'], ['total', 'Total']])}</div><div class="field"><label>Balls</label>${seg('balls', [['true', 'Range balls'], ['false', 'Real balls']])}</div></div>

@@ -1,7 +1,7 @@
 /* Account and Friends pages (on top of cloud.js). */
 
 Views.account = function () {
-  let html = `<div class="page-head"><div><p class="eyebrow">Account</p><h1>${Cloud.user ? 'Your account' : 'Sign in to sync'}</h1><p class="muted">An account backs up your rounds, practice and courses, keeps your phone and computer in step, and lets you compete with friends.</p></div></div>`;
+  let html = `<div class="page-head"><div><h1>${Cloud.user ? 'Account' : 'Sign in to sync'}</h1><p class="muted">Back up your data and use it on every device.</p></div></div>`;
   if (!Cloud.available()) return html + '<div class="callout warn">Accounts are not available in this build.</div>';
   const busy = App.ui.authBusy ? 'disabled' : '';
   if (Cloud.recovery) {
@@ -37,7 +37,7 @@ Views.account = function () {
 };
 
 Views.friends = function () {
-  let html = `<div class="page-head"><div><p class="eyebrow">Social</p><h1>Friends &amp; leaderboard</h1><p class="muted">Add friends with their code and see who's putting in the work.</p></div></div>`;
+  let html = `<div class="page-head"><div><h1>Friends</h1><p class="muted">Add friends with their code and compare.</p></div></div>`;
   if (!Cloud.user) return html + `<div class="empty">Friends need an account. <a href="#/account">Sign in or create one</a>. It's free.</div>`;
   const lb = App.ui.lb; const tab = App.ui.lbTab || 'practice'; const me = Cloud.user.id; const p = Cloud.profile || {};
   if (!lb && !App.ui.lbLoading) App.after(() => Actions.loadLeaderboard());

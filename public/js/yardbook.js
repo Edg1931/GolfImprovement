@@ -114,8 +114,8 @@ Views.yardbook = function () {
   App.after(() => {
     mapped.forEach(n => { const img = document.getElementById('yb' + n); if (!img || img.src) return; const cv = Yardbook.page(c, n); if (cv) img.src = cv.toDataURL('image/png'); });
   });
-  return `<div class="page-head no-print"><div><p class="eyebrow">Course notes</p><h1>Yardage book</h1><p class="muted">One page per hole: carries over hazards, layup yardages, green depth and your shot plan. Print it or save it as a PDF to keep in your bag.</p></div>
-      <div class="btn-row"><button class="btn primary" data-action="ybPrint" ${mapped.length ? '' : 'disabled'}>🖨 Print or save PDF</button><button class="btn" data-action="ybShare" ${mapped.length ? '' : 'disabled'}>↗ Share pages</button></div></div>
+  return `<div class="page-head no-print"><div><h1>Yardage book</h1><p class="muted">A page per hole with carries, layups and your plan.</p></div>
+      <div class="btn-row"><button class="btn primary" data-action="ybPrint" ${mapped.length ? '' : 'disabled'}>Print or save PDF</button><button class="btn" data-action="ybShare" ${mapped.length ? '' : 'disabled'}>Share pages</button></div></div>
     <div class="map-bar no-print"><select data-change="ybCourse" aria-label="Course">${courses.map(x => `<option value="${x.id}" ${x.id === c.id ? 'selected' : ''}>${escapeHtml(x.name)}${x.tees ? ' · ' + escapeHtml(x.tees) : ''}</option>`).join('')}</select></div>
     ${mapped.length < holes.length ? `<div class="callout info small mt no-print">${mapped.length ? `${holes.length - mapped.length} hole${holes.length - mapped.length === 1 ? ' isn’t' : 's aren’t'} mapped yet (${holes.filter(n => !mapped.includes(n)).join(', ')}).` : 'This course isn’t mapped yet.'} <a href="#" data-action="openHoleView" data-id="${c.id}" data-hole="${holes.find(n => !mapped.includes(n)) || 1}">Map ${mapped.length ? 'them' : 'it'} in the hole view</a>: find the course, then tap each tee and green.</div>` : ''}
     <div class="yb-pages">${mapped.map(n => `<div class="yb-page"><img id="yb${n}" alt="Hole ${n} yardage page"></div>`).join('')}</div>`;

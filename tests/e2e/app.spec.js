@@ -288,9 +288,10 @@ test('full-screen hole view: turned map, draggable target, score and shot tracki
   expect(await page.evaluate(() => HoleView.holeFeatures(HoleView.info()).some(f => f.type === 'green' && f.ll.some(p => p.lon > -121.949)))).toBe(false);   // not hole 2's green
   // drag the target to the right; round trip through the turned map keeps the point under the finger
   const before = await page.evaluate(() => HoleView.s.target);
-  const box = await page.locator('#hvTarget').boundingBox();
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down();
-  await page.mouse.move(box.x + box.width / 2 + 40, box.y + box.height / 2 - 20, { steps: 4 }); await page.mouse.up();
+  await page.waitForFunction(() => HoleView.s.adviceKey === HoleView.adviceKey());
+  const tp = await page.evaluate(() => HoleView.toScreen(HoleView.s.target));
+  await page.mouse.move(tp.x, tp.y); await page.mouse.down();
+  await page.mouse.move(tp.x + 40, tp.y - 20, { steps: 4 }); await page.mouse.up();
   const moved = await page.evaluate(b => { const t = HoleView.s.target, s = HoleView.toScreen(t), s0 = HoleView.toScreen(b); return { dx: s.x - s0.x, dy: s.y - s0.y }; }, before);
   expect(moved.dx).toBeGreaterThan(30); expect(moved.dy).toBeLessThan(-10);
   // tap the green: aim at the flag

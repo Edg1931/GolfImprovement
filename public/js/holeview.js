@@ -627,7 +627,7 @@ Views.gps = function () {
         <div class="hv-cell"><small>Hcp</small><strong>${h.si || '—'}</strong></div>
       </div>
     </div>
-    ${setup ? '' : s.mode === 'bend' ? '<div class="hv-hint">Tap the corner of the dogleg, where the hole bends <button class="btn sm ghost" data-action="hvBendMode">Cancel</button></div>' : s.mode === 'pin' ? '<div class="hv-hint">Tap where the flag is on the green <button class="btn sm ghost" data-action="hvPinMode">Cancel</button></div>' : tip ? `<button class="hv-tip" data-action="hvTipHide" aria-label="Caddie tip, tap to hide">💡 ${escapeHtml(tip)}</button>` : ''}
+    ${setup ? '' : s.mode === 'bend' ? '<div class="hv-hint">Tap the corner of the dogleg, where the hole bends <button class="btn sm ghost" data-action="hvBendMode">Cancel</button></div>' : s.mode === 'pin' ? '<div class="hv-hint">Tap where the flag is on the green <button class="btn sm ghost" data-action="hvPinMode">Cancel</button></div>' : tip ? `<button class="hv-tip" data-action="hvTipHide" aria-label="Caddie tip, tap to hide">${escapeHtml(tip)}</button>` : ''}
     ${setup ? setupHtml(h) : ''}
     <div class="hv-side">
       <button class="hv-round hv-wind" id="hvWind" data-action="hvSheet" data-v="tools" aria-label="Wind" hidden></button>
@@ -639,7 +639,7 @@ Views.gps = function () {
     <div class="hv-bottom">
       ${lastShot && !gps.start ? `<button class="hv-lie" data-action="hvSheet" data-v="lie">Last shot: ${escapeHtml(lastShot.club || 'shot')} · ${Math.round(yardsBetween(lastShot.from, lastShot.to))} yds · <b>${SG.LIES.find(l => l[0] === lastShot.toLie)?.[1] || lastShot.toLie}</b> ✎</button>` : ''}
       ${hlr || setup ? '' : planStripHtml(h)}
-      ${hlr ? `<button class="hv-track ${gps.start ? 'on' : ''}" id="hvTrack" data-action="${gps.start ? 'hvMeasure' : 'hvSheet'}" data-v="club">${gps.start ? `📏 Measure ${gps.club ? escapeHtml(gps.club) : 'shot'} <small>${App._lastPos ? Math.round(yardsBetween(gps.start, App._lastPos)) + ' yds so far' : 'walk to your ball'}</small>` : `📍 Track shot${gps.last != null ? ` <small>last: ${gps.last} yds${gps.lastClub ? ' ' + escapeHtml(gps.lastClub) : ''}${gps.lastLat != null && Math.abs(gps.lastLat) >= 2 ? ', ' + Math.abs(Math.round(gps.lastLat)) + (gps.lastLat > 0 ? ' R' : ' L') : ''}</small>` : ''}`}</button>` : ''}
+      ${hlr ? `<button class="hv-track ${gps.start ? 'on' : ''}" id="hvTrack" data-action="${gps.start ? 'hvMeasure' : 'hvSheet'}" data-v="club">${gps.start ? `Measure ${gps.club ? escapeHtml(gps.club) : 'shot'} <small>${App._lastPos ? Math.round(yardsBetween(gps.start, App._lastPos)) + ' yds so far' : 'walk to your ball'}</small>` : `Track shot${gps.last != null ? ` <small>last: ${gps.last} yds${gps.lastClub ? ' ' + escapeHtml(gps.lastClub) : ''}${gps.lastLat != null && Math.abs(gps.lastLat) >= 2 ? ', ' + Math.abs(Math.round(gps.lastLat)) + (gps.lastLat > 0 ? ' R' : ' L') : ''}</small>` : ''}`}</button>` : ''}
       <div class="hv-row">
         ${hlr ? '<a class="hv-btn" href="#/play"><span>Scorecard</span><small>›</small></a>' : '<button class="hv-btn" data-action="hvPlan"><span>Planner</span><small>›</small></button>'}
         ${hlr ? `<button class="hv-score ${cur.strokes != null ? 'done' : ''}" data-action="hvSheet" data-v="score"><strong>Hole ${h.n}</strong><small>${cur.strokes != null ? `${cur.strokes} · ${scoreName(cur.strokes, h.par)}` : 'Enter score'}</small></button>`
@@ -662,7 +662,7 @@ function setupHtml(h) {
     return `<div class="hv-setup card find"><h3>Where is ${escapeHtml(c.name)}?</h3><p class="small">Search for it to see the course on the satellite map. You only do this once.</p>
       <form data-form="hvPlace" class="hv-search"><input name="q" aria-label="Course or town" value="${escapeHtml(App.ui.hvPlaceQ || [c.name, c.location].filter(Boolean).join(' '))}" required><button class="btn primary" type="submit">Search</button></form>
       ${res ? (res.length ? `<ul class="hv-places">${res.map((r, i) => `<li><button data-action="hvPlacePick" data-i="${i}"><strong>${escapeHtml(r.name)}</strong><small>${escapeHtml(r.detail)}</small></button></li>`).join('')}</ul>` : '<p class="small muted">Nothing found. Try the course name with its town.</p>') : ''}
-      <button class="btn sm ghost mt" data-action="hvPlaceMe">📍 I'm at the course</button></div>`;
+      <button class="btn sm ghost mt" data-action="hvPlaceMe">I'm at the course</button></div>`;
   }
   const none = !(c.map && Object.keys(c.map.holes || {}).length);
   return `<div class="hv-setup"><div class="hv-setup-txt"><b>Hole ${h.n}${h.par ? ' · Par ' + h.par : ''}${h.yards ? ' · ' + h.yards + ' yds' : ''}</b>
@@ -737,13 +737,13 @@ function hvSheetHtml(sheet, h) {
   if (sheet === 'tools') {
     const dl = App.ui.dl, off = h.c.offline;
     return `${close}<h3>Tools</h3>${condLine(HoleView.cur())}${hvWindHtml()}
-      <div class="entry"><div class="entry-label">Hole map</div><div class="btn-row"><button class="btn sm" data-action="hvBendMode">↪ Mark a dogleg bend</button><button class="btn sm" data-action="hvRemap">↺ Re-mark tee &amp; green</button></div></div>
-      <div class="entry"><div class="entry-label">Flag</div><div class="btn-row"><button class="btn sm" data-action="hvPinMode">⚑ ${h.pin ? 'Move' : 'Set'} today's flag</button><button class="btn sm" data-action="hvPinHere">📍 I'm at the flag</button>${h.pin ? '<button class="btn sm ghost danger" data-action="hvPinClear">Clear</button>' : ''}</div></div>
+      <div class="entry"><div class="entry-label">Hole map</div><div class="btn-row"><button class="btn sm" data-action="hvBendMode">Mark a dogleg bend</button><button class="btn sm" data-action="hvRemap">Re-mark tee &amp; green</button></div></div>
+      <div class="entry"><div class="entry-label">Flag</div><div class="btn-row"><button class="btn sm" data-action="hvPinMode">${h.pin ? 'Move' : 'Set'} today's flag</button><button class="btn sm" data-action="hvPinHere">I'm at the flag</button>${h.pin ? '<button class="btn sm ghost danger" data-action="hvPinClear">Clear</button>' : ''}</div></div>
       <div class="entry"><div class="entry-label">Offline</div>
         ${dl && dl.running ? `<div class="progress"><span id="dlBar" style="width:${Math.round(100 * dl.done / Math.max(1, dl.total))}%"></span></div><p class="tiny muted mb0" id="dlText">Saving ${dl.done} of ${dl.total} map tiles…</p>`
-          : `<button class="btn sm" data-action="hvDownload">⬇ ${off ? 'Update offline maps' : 'Save this course for offline'}</button><p class="tiny muted mt mb0">${off ? `Saved ${fmtDate(off.at)} (${off.tiles} tiles).` : `Stores the satellite images for every mapped hole (about ${Math.max(1, Math.round(Offline.urls(h.c).length * 0.02))} MB) so the map works with no signal.`}</p>`}</div>
+          : `<button class="btn sm" data-action="hvDownload">${off ? 'Update offline maps' : 'Save this course for offline'}</button><p class="tiny muted mt mb0">${off ? `Saved ${fmtDate(off.at)} (${off.tiles} tiles).` : `Stores the satellite images for every mapped hole (about ${Math.max(1, Math.round(Offline.urls(h.c).length * 0.02))} MB) so the map works with no signal.`}</p>`}</div>
       <label class="field inline"><input type="checkbox" data-change="hvAutoHole" ${App.state.settings.autoHole === false ? '' : 'checked'}> Move to the next hole when I reach its tee</label>
-      <div class="btn-row mt"><button class="btn" data-action="hvResetTarget">↺ Reset target</button><button class="btn" data-action="hvGlance">123 Big numbers</button><button class="btn" data-action="openFinder">📏 Rangefinder</button><button class="btn" data-action="openYardbook">📖 Yardage book</button><button class="btn" data-action="hvPlan">🗺 Shot planner</button>${lr ? '<a class="btn" href="#/play">📋 Full scorecard</a>' : ''}</div>
+      <div class="btn-row mt"><button class="btn" data-action="hvResetTarget">Reset target</button><button class="btn" data-action="hvGlance">Big numbers</button><button class="btn" data-action="openFinder">Rangefinder</button><button class="btn" data-action="openYardbook">Yardage book</button><button class="btn" data-action="hvPlan">Shot planner</button>${lr ? '<a class="btn" href="#/play">Full scorecard</a>' : ''}</div>
       <p class="tiny muted mt mb0">Tap the map to move the target, or drag it. Tap the green to aim at the flag. The ring shows where about 3 in 4 of your shots with that club finish.</p>`;
   }
   return '';
@@ -758,7 +758,7 @@ function condLine(cd) {
   else if (cd.windSrc === 'manual') bits.push(`Wind ${Math.abs(cd.head)} mph ${cd.head > 0 ? 'into you' : 'helping'} (yours)`);
   if (cd.elevSrc && Math.abs(cd.rise) >= 2) bits.push(`${Math.abs(cd.rise)} yds ${cd.rise > 0 ? 'uphill' : 'downhill'}${cd.elevSrc === 'manual' ? ' (yours)' : ''}`);
   if (!bits.length) return `<p class="tiny muted">${navigator.onLine ? 'No wind or slope worth adjusting for.' : 'Offline: live wind and slope are unavailable.'}</p>`;
-  return `<p class="small hv-cond">🌬 ${bits.join(' · ')}${Math.abs(cd.adj) >= 2 ? ` → plays <strong>${cd.adj > 0 ? '+' : '−'}${Math.abs(cd.adj)} yds</strong>` : ''}${Math.abs(cd.drift) >= 3 ? `, aim ${Math.abs(cd.drift)} yds ${cd.drift > 0 ? 'left' : 'right'}` : ''}.</p>`;
+  return `<p class="small hv-cond">${bits.join(' · ')}${Math.abs(cd.adj) >= 2 ? ` → plays <strong>${cd.adj > 0 ? '+' : '−'}${Math.abs(cd.adj)} yds</strong>` : ''}${Math.abs(cd.drift) >= 3 ? `, aim ${Math.abs(cd.drift)} yds ${cd.drift > 0 ? 'left' : 'right'}` : ''}.</p>`;
 }
 
 Object.assign(Actions, {

@@ -6,7 +6,7 @@ const sgColor = v => v == null ? '#ffffff' : v >= 0.1 ? SG_COLORS.good : v <= -0
 const LIE_NAME = Object.fromEntries(SG.LIES);
 
 function shotMapButton(r) {
-  return r.holes && r.holes.some(h => h.shots && h.shots.length) ? `<button class="btn" data-action="openShotMap" data-id="${r.id}">🗺 Shot map</button>` : '';
+  return r.holes && r.holes.some(h => h.shots && h.shots.length) ? `<button class="btn" data-action="openShotMap" data-id="${r.id}">Shot map</button>` : '';
 }
 
 const ShotMap = {
@@ -114,8 +114,8 @@ Views.shotmap = function () {
   let i = App.ui.smHole != null ? App.ui.smHole : (with_[0] || 0); if (i >= r.holes.length) i = 0;
   const d = ShotMap.data(r, i);
   App.after(() => ShotMap.mount(r, i));
-  return `<div class="page-head"><div><p class="eyebrow">${fmtDate(r.date)} · ${escapeHtml(r.course || '')}</p><h1>Shot map</h1><p class="muted">Every shot you tracked, coloured by strokes gained against a ${App.targetHcp()} handicap: <span class="sg-pos">green</span> gained, <span class="sg-neg">red</span> lost.</p></div>
-      <div class="btn-row"><button class="btn primary" data-action="shareShotHole">↗ Share this hole</button><a class="btn" href="#/rounds">‹ Rounds</a></div></div>
+  return `<div class="page-head"><div><p class="eyebrow">${fmtDate(r.date)} · ${escapeHtml(r.course || '')}</p><h1>Shot map</h1><p class="muted"><span class="sg-pos">Green</span> gained strokes, <span class="sg-neg">red</span> lost them.</p></div>
+      <div class="btn-row"><button class="btn primary" data-action="shareShotHole">Share this hole</button><a class="btn" href="#/rounds">‹ Rounds</a></div></div>
     <div class="hole-strip light">${r.holes.map((h, k) => `<button class="hole-pill ${k === i ? 'cur' : ''} ${scoreClass(h.strokes, r.pars[k])} ${h.shots && h.shots.length ? 'mapped' : ''}" data-action="smHole" data-i="${k}"><small>${(r.firstHole || 0) + k + 1}</small>${h.strokes ?? '·'}</button>`).join('')}</div>
     <div class="map-layout mt"><div class="map-slot" id="smSlot"></div>
     <div class="map-panel"><div class="card"><div class="card-head"><h3>Hole ${d.n} · Par ${d.par}</h3><span class="badge ${scoreClass(d.h.strokes, d.par)}">${d.h.strokes} · ${scoreName(d.h.strokes, d.par)}</span></div>

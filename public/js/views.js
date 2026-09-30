@@ -71,58 +71,39 @@ Views.dashboard = function () {
   const todayName = DAYS[(new Date().getDay() + 6) % 7]; const today = plan.find(d => d.day === todayName);
   const ach = achievements(); const achDone = ach.filter(a => a.done);
   const lr = App.state.liveRound;
-  let html = `<div class="page-head"><div><p class="eyebrow">${new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}</p><h1>${greet}${p.name ? ', ' + escapeHtml(p.name) : ''}</h1><p class="muted">${rounds.length ? rounds.length + ' round' + (rounds.length > 1 ? 's' : '') + ' logged · ' + achDone.length + '/' + ach.length + ' achievements' : 'Your golf improvement hub.'}</p></div>
-    <div class="btn-row"><a class="btn primary" href="#/play">⛳ Play a round</a><a class="btn" href="#/rounds">+ Log round</a><a class="btn" href="#/sessions">+ Log practice</a></div></div>`;
-  if (lr) { const t = liveTotals(lr); html += `<a class="resume card" href="#/play"><span class="pulse" aria-hidden="true"></span><div><strong>Round in progress · ${escapeHtml(lr.course)}</strong><div class="small muted">Thru ${t.thru} · ${t.thru ? toPar(t.toPar) : 'E'} · tap to resume on hole ${lr.cur + 1}</div></div><span class="btn primary sm">Resume ›</span></a>`; }
+  const dateStr = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+  let html = `<div class="page-head"><div><h1>${greet}${p.name ? ', ' + escapeHtml(p.name) : ''}</h1><p class="muted">${dateStr}</p></div>
+    <div class="btn-row"><a class="btn primary" href="#/play">Play a round</a><a class="btn" href="#/rounds">Log round</a><a class="btn" href="#/sessions">Log practice</a></div></div>`;
+  if (lr) { const t = liveTotals(lr); html += `<a class="resume card" href="#/play"><span class="pulse" aria-hidden="true"></span><div><strong>Round in progress · ${escapeHtml(lr.course)}</strong><div class="small muted">Thru ${t.thru} · ${t.thru ? toPar(t.toPar) : 'E'}</div></div><span class="btn primary sm">Resume</span></a>`; }
   if (!rounds.length) html += onboarding();
 
+  // handicap: the number that matters, its target and its trend
   html += `<div class="hero">
-    <div class="card accent"><div class="stat-row">
-      ${statBox('Handicap Index', idx != null ? fmt1(idx) : '—', indexSub(rounds, trend != null ? (trend <= 0 ? '▼ ' : '▲ ') + fmt1(Math.abs(trend)) + ' vs 5 rounds ago' : null))}
+    <div class="card accent dash-index"><div class="stat-row">
+      ${statBox('Handicap index', idx != null ? fmt1(idx) : '—', trend != null ? (trend <= 0 ? '▼ ' : '▲ ') + fmt1(Math.abs(trend)) + ' in 5 rounds' : (rounds.length ? indexSub(rounds, null) : 'Log 3 rounds'))}
       ${statBox('Target', p.targetIndex != null ? fmt1(p.targetIndex) : '—', p.targetDate ? 'by ' + fmtDate(p.targetDate) : '<a href="#/goals">Set a goal</a>')}
-      ${statBox('Avg score (last 5)', st5 ? Math.round(st5.score) : '—', st5 ? 'best ' + Math.min(...App.fullRounds().slice(0, 5).map(r => r.grossScore ?? r.score)) : '')}
+      ${statBox('Average score', st5 ? Math.round(st5.score) : '—', st5 ? 'last 5' : '')}
     </div>
     ${(idx != null && p.targetIndex != null) ? App.goalProgressBar(idx) : ''}
-    ${rounds.length ? `<div class="kv mt small"><dt>Rounds counting</dt><dd>${App.countedDiffs().length} best of last ${Math.min(rounds.length, 20)}</dd><dt>Low differential</dt><dd>${lowDiff(rounds)}</dd><dt>Level</dt><dd>${tier.label} (${tier.range})</dd>${prog ? `<dt>Program</dt><dd>Week ${prog.week} of 12</dd>` : ''}</div>` : ''}
     </div>
-    <div class="card"><div class="card-head"><h3>Index trend</h3><a class="small" href="#/rounds">All rounds</a></div><canvas class="chart" id="dashIndexChart"></canvas></div>
+    <div class="card"><div class="card-head"><h3>Trend</h3><a class="small" href="#/rounds">Rounds</a></div><canvas class="chart" id="dashIndexChart"></canvas></div>
   </div>`;
 
-  html += `<div class="grid grid-2 mt"><div class="card today"><div class="card-head"><h3>Today · ${todayName}</h3><a class="small" href="#/plan">Schedule</a></div>
-      ${today && today.session ? `<div class="today-body"><div><div class="today-title">${escapeHtml(today.session.name)}</div><p class="small muted mb0">${today.session.minutes} min · ${today.session.drills.map(([id, m]) => drillLink(id) + ` <span class="muted">${m}′</span>`).join(' · ')}</p></div>
-        <div class="btn-row">${checks[todayName] ? '<span class="badge good">✓ Done</span>' : `<button class="btn primary sm" data-action="startTodaySession" data-sid="${today.session.id}">Start session</button>`}</div></div>`
-      : `<p class="muted mb0">Rest day. Ten minutes of putting on the carpet or a mobility flow keeps the feel alive.</p>`}
-      ${prog ? `<p class="tiny muted mt mb0">Program week ${prog.week}: ${escapeHtml(PROGRAM.weekThemes[prog.week])}</p>` : ''}</div>
-    <div class="card"><div class="card-head"><h3>Achievements</h3><a class="small" href="#/goals">All ${ach.length}</a></div>
-      <div class="ach-strip">${ach.slice().sort((a, b) => b.done - a.done).slice(0, 8).map(a => `<span class="ach-chip ${a.done ? 'on' : ''}" title="${escapeHtml(a.name + ': ' + a.desc)}">${a.icon}</span>`).join('')}</div>
-      <p class="small muted mb0 mt">${achDone.length ? `${achDone.length} unlocked. Next up: <strong>${escapeHtml((ach.find(a => !a.done) || { name: 'all done!' }).name)}</strong> ${escapeHtml((ach.find(a => !a.done) || { desc: '' }).desc.toLowerCase())}.` : 'Log a round to unlock your first badge.'}</p></div>
+  // today's practice and the biggest leaks, side by side
+  html += `<div class="grid grid-2 mt"><div class="card today"><div class="card-head"><h3>Today</h3><a class="small" href="#/plan">Schedule</a></div>
+      ${today && today.session ? `<div class="today-body"><div><div class="today-title">${escapeHtml(today.session.name)}</div><p class="small muted mb0">${today.session.minutes} min · ${today.session.drills.length} drills</p></div>
+        <div class="btn-row">${checks[todayName] ? '<span class="badge good">Done</span>' : `<button class="btn primary sm" data-action="startTodaySession" data-sid="${today.session.id}">Start</button>`}</div></div>`
+      : `<p class="muted mb0">Rest day.</p>`}
+      <div class="row-between small muted mt"><span>This week</span><span>${done} of ${planned.length} sessions</span></div>
+      <div class="progress mt-xs"><span style="width:${pct(done, planned.length)}%"></span></div></div>
+    <div class="card"><div class="card-head"><h3>Focus</h3><a class="small" href="#/stats">Stats</a></div>
+      ${analysis.length ? (recs.length ? `<ul class="focus-list">${recs.map(r => `<li><span>${r.area.label}</span><strong>−${fmt1(r.area.loss)}</strong></li>`).join('')}</ul><p class="tiny muted mb0 mt">Strokes a round against a ${App.targetHcp()} handicap.</p>` : '<p class="muted mb0">You match your target in every area. Nice.</p>')
+        : '<p class="muted mb0">Log rounds with stats to see where strokes go.</p>'}</div>
   </div>`;
 
-  html += `<div class="grid grid-4 mt">
-    <div class="card tight">${statBox('Putts / round', st5 ? fmt1(st5.putts) : '—', 'last 5 rounds')}</div>
-    <div class="card tight">${statBox('Greens in reg.', st5 && st5.gir != null ? fmt1(st5.gir) : '—', st5 && st5.girPct != null ? Math.round(st5.girPct) + '% of 18' : '')}</div>
-    <div class="card tight">${statBox('Fairways', st5 && st5.firPct != null ? Math.round(st5.firPct) + '%' : '—', 'last 5 rounds')}</div>
-    <div class="card tight">${statBox('Scrambling', st5 && st5.scrambling != null ? Math.round(st5.scrambling) + '%' : '—', 'up-and-down rate')}</div>
-  </div>`;
-
-  html += `<div class="grid grid-2 mt">
-    <div class="card"><div class="card-head"><h3>This week's practice</h3><a class="small" href="#/plan">Full schedule</a></div>
-      <p class="muted small">${tier.label} plan · ${TIME_BUDGETS.find(b => b.id === p.budget).hours} · ${done}/${planned.length} sessions done</p>
-      <div class="progress mb"><span style="width:${pct(done, planned.length)}%"></span></div>
-      <ul class="checklist">${plan.filter(d => d.session).map(d => `<li><input type="checkbox" data-change="planCheck" data-week="${wk}" data-day="${d.day}" ${checks[d.day] ? 'checked' : ''}><div><strong class="${checks[d.day] ? 'done' : ''}">${d.day} · ${escapeHtml(d.session.name)}</strong><div class="small muted">${d.session.minutes} min · ${d.session.drills.map(([id]) => drillLink(id)).join(', ')}</div></div></li>`).join('')}</ul>
-    </div>
-    <div class="card"><div class="card-head"><h3>Where you lose strokes</h3><a class="small" href="#/stats">Full analysis</a></div>
-      ${analysis.length ? recs.length ? recs.map((r, i) => `<div class="rank"><div class="n ${['', 'two', 'three'][i]}">${i + 1}</div><div><h3>${r.area.label}</h3><p class="small muted mb0">You: ${r.area.yours} · Benchmark (${App.targetHcp()} hcp): ${r.area.bench} · ≈ <strong>${fmt1(r.area.loss)} strokes/round</strong></p><p class="small mb0">Drills: ${r.drills.map(d => drillLink(d.id)).join(' · ')}</p></div></div>`).join('') : '<div class="callout">Your stats already match your target benchmark in every area. Time to raise the target!</div>' : '<div class="empty">Log rounds with putts, greens and fairways to see your stroke-loss analysis.</div>'}
-    </div>
-  </div>`;
-
-  html += `<div class="grid grid-2 mt">
-    <div class="card"><div class="card-head"><h3>12-week program</h3><a class="small" href="#/plan">Details</a></div>
-      ${prog ? `<p><strong>Week ${prog.week} of 12</strong> · ${escapeHtml(prog.phase.name)}</p><div class="phase-bar">${[...Array(12)].map((_, i) => `<span class="${i < 4 ? 'p1' : i < 8 ? 'p2' : 'p3'} ${i + 1 === prog.week ? 'current' : ''}"></span>`).join('')}</div><p class="small muted mb0">This week: ${escapeHtml(PROGRAM.weekThemes[prog.week])}</p>` : `<p class="muted">Not started. The program structures 12 weeks into Foundation, Build and Perform phases.</p><button class="btn primary sm" data-action="startProgram">Start the 12-week program</button>`}
-    </div>
-    <div class="card"><div class="card-head"><h3>Recent rounds</h3><a class="small" href="#/rounds">All</a></div>
-      ${rounds.length ? `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Course</th><th class="num">Score</th><th class="num">Diff</th><th class="num">Putts</th></tr></thead><tbody>${rounds.slice(0, 5).map(r => `<tr><td>${fmtDate(r.date)}</td><td>${escapeHtml(r.course || '—')}${holesLabel(r)}</td><td class="num">${r.grossScore ?? r.score}</td><td class="num">${fmt1(r.diff)}</td><td class="num">${r.putts != null ? r.putts : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">No rounds yet.</div>'}
-    </div>
+  // recent rounds
+  html += `<div class="card mt"><div class="card-head"><h3>Recent rounds</h3><a class="small" href="#/rounds">All</a></div>
+      ${rounds.length ? `<ul class="round-list">${rounds.slice(0, 4).map(r => `<li data-action="viewCard" data-id="${r.id}"><div><strong>${escapeHtml(r.course || 'Round')}</strong>${holesLabel(r)}<div class="tiny muted">${fmtDate(r.date)}${r.putts != null ? ' · ' + r.putts + ' putts' : ''}</div></div><div class="round-score"><strong>${r.grossScore ?? r.score}</strong><span class="tiny muted">${r.diff != null ? fmt1(r.diff) : ''}</span></div></li>`).join('')}</ul>` : '<p class="muted mb0">No rounds yet.</p>'}
   </div>`;
 
   App.after(() => {
@@ -139,14 +120,14 @@ Views.rounds = function () {
   const saved = App.ui.roundCourse ? App.state.courses.find(c => c.id === App.ui.roundCourse) : null;
   const last = saved ? { course: saved.name, tees: saved.tees, rating: saved.rating, slope: saved.slope, par: sum(saved.pars) } : (rounds[0] || {});
   const hist = indexHistory(rounds);
-  let html = `<div class="page-head"><div><h1>Rounds &amp; Handicap</h1><p class="muted">Log every round with stats. Your Handicap Index follows the World Handicap System (best 8 of your last 20 differentials).</p></div></div>`;
+  let html = `<div class="page-head"><div><h1>Rounds</h1><p class="muted">Your Handicap Index uses the World Handicap System: best 8 of your last 20.</p></div></div>`;
   html += `<div class="grid grid-3">
     <div class="card accent">${statBox('Handicap Index', idx != null ? fmt1(idx) : '—', indexSub(rounds))}</div>
     <div class="card">${statBox('Low differential', lowDiff(rounds), 'last 20 scores')}</div>
     <div class="card">${statBox('Avg score', App.fullRounds().length ? fmt1(avg(App.fullRounds().slice(0, 20).map(r => r.grossScore ?? r.score))) : '—', 'last 20 full rounds')}</div>
   </div>`;
 
-  html += `<div class="grid grid-2 mt"><div class="card"><div class="card-head"><h2>Log a round</h2><a class="btn sm" href="#/play">⛳ Score hole by hole</a></div>
+  html += `<div class="grid grid-2 mt"><div class="card"><div class="card-head"><h2>Log a round</h2><a class="btn sm" href="#/play">Score hole by hole</a></div>
   <form class="form" data-form="round">
     ${App.state.courses.length ? `<div class="field"><label>Saved course</label><select data-change="roundCourse"><option value="">Type it in…</option>${App.state.courses.map(c => `<option value="${c.id}" ${saved && saved.id === c.id ? 'selected' : ''}>${escapeHtml(c.name)}${c.tees ? ' · ' + escapeHtml(c.tees) : ''}</option>`).join('')}</select></div>` : ''}
     <div class="form-row">
@@ -202,7 +183,7 @@ Views.stats = function () {
   const rounds = App.rounds(); const n = App.ui.statsWindow || 10;
   const st = roundStats(rounds, n); const target = App.targetHcp(); const b = benchmarkFor(target);
   const analysis = strokeLossAnalysis(st, target); const recs = recommendDrills(analysis, 3);
-  let html = `<div class="page-head"><div><h1>Stats &amp; Stroke Loss</h1><p class="muted">Compare your averages to a benchmark golfer at your target handicap and see where the strokes go.</p></div>
+  let html = `<div class="page-head"><div><h1>Stats</h1><p class="muted">You against a golfer at your target handicap.</p></div>
     <div class="chip-row">${[5, 10, 20].map(k => `<button class="chip ${n === k ? 'active' : ''}" data-action="statsWindow" data-n="${k}">Last ${k}</button>`).join('')}</div></div>`;
   if (!st) return html + '<div class="empty">Log some rounds with stats first. <a href="#/rounds">Go to Rounds</a></div>';
 
@@ -229,12 +210,12 @@ Views.stats = function () {
 
   html += sgCard(rounds, n);
   html += PlanReview.card(rounds, n);
-  html += `<div class="card mt"><h2>Priority focus areas</h2>
-    ${recs.length ? recs.map((r, i) => `<div class="rank"><div class="n ${['', 'two', 'three'][i]}">${i + 1}</div><div>
-      <h3>${r.area.label} <span class="badge ${r.area.loss > 2 ? 'bad' : 'warn'}">≈ ${fmt1(r.area.loss)} strokes</span></h3>
-      <p class="small muted">You: <strong>${r.area.yours}</strong> · Benchmark: <strong>${r.area.bench}</strong>. ${r.area.note}</p>
-      <div class="grid grid-3">${r.drills.map(d => drillCard(d, true)).join('')}</div></div></div>`).join('')
-      : '<div class="callout">You are at or better than the benchmark in every area we measure. Raise your target handicap on the Goals page to find the next gap.</div>'}
+  html += `<div class="card mt"><h2>Focus areas</h2>
+    ${recs.length ? recs.map((r, i) => `<div class="rank"><div class="n">${i + 1}</div><div class="grow">
+      <div class="row-between"><h3 class="mb0">${r.area.label}</h3><span class="focus-loss">−${fmt1(r.area.loss)}</span></div>
+      <p class="small muted mb0">You ${r.area.yours} · target ${r.area.bench}</p>
+      <div class="chip-row mt-xs">${r.drills.map(d => `<button class="chip" data-action="openDrill" data-id="${d.id}">${escapeHtml(d.name)}</button>`).join('')}</div></div></div>`).join('')
+      : '<p class="muted mb0">You match your target in every area. Raise your target on the Goals page to find the next gap.</p>'}
   </div>`;
 
   const hb = holeBreakdown(rounds.slice(0, n));
@@ -279,7 +260,7 @@ Views.sessions = function () {
   const streak = practiceStreak(sessions);
   const pending = App.ui.sessionDrills || [];
 
-  let html = `<div class="page-head"><div><h1>Practice Log</h1><p class="muted">Log every session with the drill scores you hit. Numbers you track are numbers that improve.</p></div></div>`;
+  let html = `<div class="page-head"><div><h1>Practice log</h1><p class="muted">Log sessions and the drill scores you hit.</p></div></div>`;
   html += `<div class="grid grid-4">
     <div class="card tight">${statBox('Sessions (28 days)', recent.length, Math.round(total / 60 * 10) / 10 + ' hours')}</div>
     <div class="card tight">${statBox('Weekly streak', streak, 'weeks with 2+ sessions')}</div>
@@ -331,7 +312,7 @@ Views.sessions = function () {
 Views.assessment = function () {
   const tier = App.tier(); const list = App.state.assessments.slice().sort((a, b) => b.date.localeCompare(a.date));
   const latest = list[0]; const prev = list[1];
-  let html = `<div class="page-head"><div><h1>Skills Test</h1><p class="muted">Nine tests, ten balls each, about 90 minutes. Run it in week 1, 6 and 12 of a program. Benchmarks shown for the <strong>${tier.label}</strong> tier (${tier.range}).</p></div></div>`;
+  let html = `<div class="page-head"><div><h1>Skills test</h1><p class="muted">Nine tests, ten balls each. Benchmarks for ${tier.label} (${tier.range}).</p></div></div>`;
 
   html += `<div class="grid grid-2"><div class="card"><h2>Run the test</h2><form class="form" data-form="assessment">
     <div class="field"><label>Date</label><input type="date" name="date" value="${todayISO()}" required></div>
@@ -362,7 +343,7 @@ Views.plan = function () {
   const wk = App.ui.planWeek || isoWeekKey(new Date()); const checks = App.state.planChecks[wk] || {};
   const totalMin = plan.reduce((a, d) => a + (d.session ? d.session.minutes : 0), 0);
   const prog = App.programWeek();
-  let html = `<div class="page-head"><div><h1>Practice Schedule</h1><p class="muted">A weekly plan built for your level and the time you have. Tick sessions off as you go; the plan rotates drill focus through the 12-week program.</p></div></div>`;
+  let html = `<div class="page-head"><div><h1>Schedule</h1><p class="muted">Your week, built for your level and time.</p></div></div>`;
 
   html += `<div class="card"><div class="form-row">
     <div class="field"><label>Level</label><select data-change="tierOverride"><option value="" ${!p.tierOverride ? 'selected' : ''}>Auto from index (${App.index() != null ? fmt1(App.index()) : 'no index yet'})</option>${TIERS.map(t => `<option value="${t.id}" ${p.tierOverride === t.id ? 'selected' : ''}>${t.label} (${t.range})</option>`).join('')}</select></div>
@@ -387,7 +368,7 @@ Views.plan = function () {
     <form class="form-row" data-form="calendar" style="align-items:end">
       <div class="field"><label>Session time</label><input type="time" name="time" value="${escapeHtml(rem.time)}" required></div>
       <div class="field"><label>For the next</label><select name="weeks">${[4, 8, 12].map(w => `<option value="${w}" ${rem.weeks == w ? 'selected' : ''}>${w} weeks</option>`).join('')}</select></div>
-      <div class="field"><button class="btn primary" type="submit">📅 Add to my calendar</button></div>
+      <div class="field"><button class="btn primary" type="submit">Add to my calendar</button></div>
     </form>
     <p class="tiny muted mt mb0">Your plan adapts as your stats change, so re-add it every month or two to keep the drills current.</p></div>`;
   html += `<div class="card mt"><div class="card-head"><h2>12-week program</h2>${prog ? `<button class="btn sm ghost danger" data-action="resetProgram">Reset</button>` : `<button class="btn primary sm" data-action="startProgram">Start today</button>`}</div>
@@ -407,7 +388,7 @@ Views.drills = function () {
   const ui = App.ui; ui.drillCat = ui.drillCat || 'all'; ui.drillQ = ui.drillQ || ''; ui.drillMax = ui.drillMax || 0; ui.drillDiff = ui.drillDiff || 0;
   let list = DRILLS.filter(d => (ui.drillCat === 'all' || d.category === ui.drillCat) && (!ui.drillFav || App.state.favorites.includes(d.id)) && (!ui.drillMax || d.minutes <= ui.drillMax) && (!ui.drillDiff || d.difficulty === ui.drillDiff));
   if (ui.drillQ) { const q = ui.drillQ.toLowerCase(); list = list.filter(d => (d.name + ' ' + d.summary + ' ' + d.skills.join(' ')).toLowerCase().includes(q)); }
-  let html = `<div class="page-head"><div><h1>Drill Library</h1><p class="muted">${DRILLS.length} drills, every one with a measurable goal. Click a drill for setup, steps and a pro tip.</p></div>
+  let html = `<div class="page-head"><div><h1>Drills</h1><p class="muted">${DRILLS.length} drills, each with a measurable goal.</p></div>
     <div class="field" style="min-width:220px"><input type="search" placeholder="Search drills…" value="${escapeHtml(ui.drillQ)}" data-change="drillQ" aria-label="Search drills"></div></div>`;
   html += `<div class="card tight"><div class="chip-row"><button class="chip ${ui.drillCat === 'all' ? 'active' : ''}" data-action="drillCat" data-cat="all">All</button>${DRILL_CATEGORIES.map(c => `<button class="chip ${ui.drillCat === c.id ? 'active' : ''}" data-action="drillCat" data-cat="${c.id}">${c.label}</button>`).join('')}<button class="chip ${ui.drillFav ? 'active' : ''}" data-action="drillFav">★ Favourites</button></div>
     <div class="chip-row mt"><span class="small muted">Time:</span>${[0, 10, 15, 30].map(m => `<button class="chip ${ui.drillMax === m ? 'active' : ''}" data-action="drillMax" data-m="${m}">${m ? '≤ ' + m + ' min' : 'Any'}</button>`).join('')}<span class="small muted" style="margin-left:10px">Difficulty:</span>${[0, 1, 2, 3].map(k => `<button class="chip ${ui.drillDiff === k ? 'active' : ''}" data-action="drillDiff" data-k="${k}">${k ? ['', 'Easy', 'Medium', 'Hard'][k] : 'Any'}</button>`).join('')}</div></div>`;
@@ -476,7 +457,7 @@ function drillModal(d) {
 Views.playbook = function () {
   const tab = App.ui.playbookTab || 'strategy';
   const tabs = [['strategy', 'Course Strategy'], ['mental', 'Mental Game'], ['warmup', 'Pre-Round Warm-Up'], ['fitness', 'Fitness'], ['glossary', 'Glossary']];
-  let html = `<div class="page-head"><div><h1>Playbook</h1><p class="muted">Strategy, mindset, warm-up and fitness: the knowledge that lowers scores without changing your swing.</p></div></div>
+  let html = `<div class="page-head"><div><h1>Playbook</h1><p class="muted">Strategy, mindset, warm-up and fitness.</p></div></div>
     <div class="tabs">${tabs.map(([id, l]) => `<button class="${tab === id ? 'active' : ''}" data-action="playbookTab" data-tab="${id}">${l}</button>`).join('')}</div>`;
   const acc = (sections) => sections.map((s, i) => `<details class="accordion" ${i === 0 ? 'open' : ''}><summary>${escapeHtml(s.title)}</summary><div class="acc-body"><ul>${s.items.map(it => `<li>${escapeHtml(it)}</li>`).join('')}</ul></div></details>`).join('');
   if (tab === 'strategy') {
@@ -515,7 +496,7 @@ Views.clubs = function () {
   const clubs = App.state.clubs; const wm = App.state.wedgeMatrix;
   const sorted = clubs.slice().sort((a, b) => b.carry - a.carry); const max = Math.max(...sorted.map(c => c.carry), 1);
   const q = App.ui.clubQuery || {};
-  let html = `<div class="page-head"><div><h1>My Clubs</h1><p class="muted">Know your real carry distances (average, not best ever). Use a launch monitor, a range with accurate markers, or the Three-Club Distance Windows drill.</p></div></div>`;
+  let html = `<div class="page-head"><div><h1>My clubs</h1><p class="muted">Your average carry, not your best ever.</p></div></div>`;
   html += `<div class="grid grid-2"><div class="card"><div class="card-head"><h3>Carry distances</h3><button class="btn sm" data-action="addClub">+ Club</button></div>
     ${sorted.map((c) => { const i = clubs.indexOf(c); const next = sorted[sorted.indexOf(c) + 1]; const gap = next ? c.carry - next.carry : null; return `<div class="gap-row"><input class="club" value="${escapeHtml(c.club)}" data-change="clubName" data-i="${i}" style="width:60px;font:inherit;font-weight:700;border:0;background:transparent;color:inherit"><div class="bar"><span style="width:${pct(c.carry, max)}%"></span></div><input class="yds" type="number" value="${c.carry}" data-change="clubCarry" data-i="${i}" style="width:64px;font:inherit;border:1px solid var(--border);border-radius:6px;padding:2px 4px;background:var(--surface);color:inherit"><span class="gap ${gap != null && (gap > 15 || gap < 6) ? 'warn' : ''}">${gap != null ? 'gap ' + gap : ''}</span><button class="btn sm ghost danger" data-action="removeClub" data-i="${i}">✕</button></div>`; }).join('')}
     <p class="tiny muted mt mb0">Gaps of 10–15 yds between clubs are ideal. A gap over 15 yds (highlighted) means a distance you cannot hit with a full swing; a gap under 6 means two clubs doing the same job.</p>
@@ -531,8 +512,8 @@ Views.clubs = function () {
       <div class="table-wrap"><table><thead><tr><th>Wedge</th><th class="num">7:30 (hip)</th><th class="num">9:00 (arm parallel)</th><th class="num">10:30 (shoulder)</th><th class="num">Full</th></tr></thead><tbody>
       ${['PW', 'GW', 'SW', 'LW'].map(w => `<tr><td><strong>${w}</strong></td>${['7:30', '9:00', '10:30', 'full'].map(k => `<td class="num"><input type="number" value="${wm[w + '-' + k] ?? ''}" data-change="wedge" data-key="${w}-${k}" style="width:64px;font:inherit;border:1px solid var(--border);border-radius:6px;padding:2px 4px;background:var(--surface);color:inherit;text-align:right"></td>`).join('')}</tr>`).join('')}</tbody></table></div></div></div></div>`;
   html += dispersionCard();
-  html += `<div class="card mt"><h3>Equipment and fitting checklist</h3><div class="grid grid-2"><ul class="small" style="padding-left:1.1rem"><li><strong>Driver loft:</strong> most amateurs need 10.5–12°. More loft = more carry and less curve for swing speeds under 100 mph.</li><li><strong>Shaft flex:</strong> under 85 mph driver speed → regular or senior; 85–100 → regular/stiff; over 100 → stiff. Too stiff is the common error.</li><li><strong>Wedges:</strong> three wedges with 4–6° gaps (e.g. 46/52/58). Bounce: high (10°+) for soft sand and steep swings, low for firm turf and shallow swings.</li><li><strong>Lie angle:</strong> toe-side marks on the sole mean too flat (shots go right); heel-side mean too upright (left). Get it checked.</li></ul>
-    <ul class="small" style="padding-left:1.1rem"><li><strong>Grips:</strong> replace every 40 rounds or yearly. Worn grips cause tight hands and slices.</li><li><strong>Ball:</strong> pick one model and stick with it so short-game spin and feel are consistent. A softer ball is fine for most amateurs.</li><li><strong>Putter:</strong> length to eyes over the ball, loft 3–4°. Face-balanced for straight-back-straight-through strokes, toe hang for arcing strokes.</li><li><strong>Hybrids:</strong> replace any iron you cannot hit 7/10 times cleanly (for many players, the 4- and 5-iron).</li></ul></div></div>`;
+  html += `<details class="accordion mt"><summary>Equipment and fitting checklist</summary><div class="acc-body"><div class="grid grid-2"><ul class="small" style="padding-left:1.1rem"><li><strong>Driver loft:</strong> most amateurs need 10.5–12°. More loft = more carry and less curve for swing speeds under 100 mph.</li><li><strong>Shaft flex:</strong> under 85 mph driver speed → regular or senior; 85–100 → regular/stiff; over 100 → stiff. Too stiff is the common error.</li><li><strong>Wedges:</strong> three wedges with 4–6° gaps (e.g. 46/52/58). Bounce: high (10°+) for soft sand and steep swings, low for firm turf and shallow swings.</li><li><strong>Lie angle:</strong> toe-side marks on the sole mean too flat (shots go right); heel-side mean too upright (left). Get it checked.</li></ul>
+    <ul class="small" style="padding-left:1.1rem"><li><strong>Grips:</strong> replace every 40 rounds or yearly. Worn grips cause tight hands and slices.</li><li><strong>Ball:</strong> pick one model and stick with it so short-game spin and feel are consistent. A softer ball is fine for most amateurs.</li><li><strong>Putter:</strong> length to eyes over the ball, loft 3–4°. Face-balanced for straight-back-straight-through strokes, toe hang for arcing strokes.</li><li><strong>Hybrids:</strong> replace any iron you cannot hit 7/10 times cleanly (for many players, the 4- and 5-iron).</li></ul></div></div></details>`;
   return html;
 };
 
@@ -549,7 +530,7 @@ Views.goals = function () {
   const commits = App.state.commitments;
   const commitList = ['Log every round with full stats within 24 hours', 'Practise putting at least once every week', 'Do the warm-up before every round', 'Aim for the centre of the green from 150+ yards', 'Use my full pre-shot routine on every shot', 'Run the Skills Test every 6 weeks', 'Two strength or mobility sessions each week', 'Never hit a shot with a penalty as the likely outcome', 'Take a lesson from a PGA professional this quarter', 'Play in a competition this month'];
   const b = target != null ? benchmarkFor(target) : null; const st = roundStats(rounds, 10);
-  let html = `<div class="page-head"><div><h1>Goals</h1><p class="muted">A target, a date, and the habits that get you there. Realistic pace: 1–2 index points per quarter for most golfers who practise with purpose.</p></div></div>`;
+  let html = `<div class="page-head"><div><h1>Goals</h1><p class="muted">A target, a date, and the habits to get there.</p></div></div>`;
   html += `<div class="grid grid-2"><div class="card"><h2>Set your target</h2><form class="form" data-form="goals">
     <div class="form-row"><div class="field"><label>Your name</label><input name="name" value="${escapeHtml(p.name)}" placeholder="Optional"></div><div class="field"><label>Home course</label><input name="homeCourse" value="${escapeHtml(p.homeCourse)}" placeholder="Optional"></div></div>
     <div class="form-row"><div class="field"><label>Starting Handicap Index</label><input type="number" step="0.1" name="startIndex" value="${p.startIndex != null ? p.startIndex : ''}" placeholder="Optional"><span class="hint">Used until you've logged 3 rounds.</span></div></div>
@@ -574,12 +555,12 @@ Views.goals = function () {
 /* ---------- Tools ---------- */
 Views.tools = function () {
   const t = App.timer; const idx = App.index(); const ch = App.ui.chCalc || {}; const sf = App.ui.stableford || {};
-  let html = `<div class="page-head"><div><h1>Tools</h1><p class="muted">Timer, random drill picker, handicap calculators, and your data.</p></div></div>`;
+  let html = `<div class="page-head"><div><h1>Tools</h1><p class="muted">Timer, calculators and your data.</p></div></div>`;
   html += `<div class="grid grid-2">
     <div class="card"><h2>Practice timer</h2><p class="small muted mb0">${t.label ? escapeHtml(t.label) : 'Pick a preset or set minutes.'}</p><div class="timer-display ${t.remaining === 0 && t.total ? 'done' : ''}" id="timerDisplay">${App.fmtTimer(t.remaining)}</div>
       <div class="btn-row" style="justify-content:center">${[5, 10, 15, 20, 30].map(m => `<button class="btn sm" data-action="timerSet" data-min="${m}">${m}</button>`).join('')}<input type="number" id="timerCustom" min="1" max="180" placeholder="min" style="width:70px;font:inherit;padding:5px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:inherit"><button class="btn sm" data-action="timerSetCustom">Set</button></div>
       <div class="btn-row mt" style="justify-content:center"><button class="btn primary" data-action="timerToggle">${t.running ? 'Pause' : 'Start'}</button><button class="btn" data-action="timerReset">Reset</button></div></div>
-    <div class="card"><h2>Random drill</h2><p class="small muted">Stuck for what to practise? Roll the dice.</p><div class="form-row"><div class="field"><label>Category</label><select id="randCat"><option value="all">Any</option>${DRILL_CATEGORIES.map(c => `<option value="${c.id}" ${App.ui.randCat === c.id ? 'selected' : ''}>${c.label}</option>`).join('')}</select></div><div class="field"><label>&nbsp;</label><button class="btn primary" data-action="randomDrill">🎲 Pick a drill</button></div></div>
+    <div class="card"><h2>Random drill</h2><p class="small muted">Stuck for what to practise? Roll the dice.</p><div class="form-row"><div class="field"><label>Category</label><select id="randCat"><option value="all">Any</option>${DRILL_CATEGORIES.map(c => `<option value="${c.id}" ${App.ui.randCat === c.id ? 'selected' : ''}>${c.label}</option>`).join('')}</select></div><div class="field"><label>&nbsp;</label><button class="btn primary" data-action="randomDrill">Pick a drill</button></div></div>
       ${App.ui.randDrill ? `<div class="mt">${drillCard(getDrill(App.ui.randDrill))}</div>` : ''}</div>
   </div>`;
   html += `<div class="grid grid-2 mt">
@@ -591,7 +572,7 @@ Views.tools = function () {
       <p class="tiny muted mb0">Stableford estimated from net score (36 + par − net); exact points depend on hole-by-hole scoring.</p></div>
   </div>`;
   html += `<div class="card mt"><h2>Your data</h2><p class="small muted">Everything is stored in this browser's local storage. Export a backup before clearing your browser data or switching devices, then import it on the other device.</p>
-    <div class="btn-row"><button class="btn primary" data-action="exportData">⬇ Export backup (JSON)</button><label class="btn" for="importFile">⬆ Import backup</label><input type="file" id="importFile" accept="application/json" class="hidden" data-change="importFile"><button class="btn" data-action="loadDemo">Load demo data</button><button class="btn danger" data-action="resetData">Delete all data</button></div>
+    <div class="btn-row"><button class="btn primary" data-action="exportData">Export backup (JSON)</button><label class="btn" for="importFile">Import backup</label><input type="file" id="importFile" accept="application/json" class="hidden" data-change="importFile"><button class="btn" data-action="loadDemo">Load demo data</button><button class="btn danger" data-action="resetData">Delete all data</button></div>
     <div class="kv mt small"><dt>Rounds</dt><dd>${App.state.rounds.length}</dd><dt>Sessions</dt><dd>${App.state.sessions.length}</dd><dt>Skills tests</dt><dd>${App.state.assessments.length}</dd></div></div>`;
   return html;
 };
