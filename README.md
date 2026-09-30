@@ -11,6 +11,7 @@ A complete, self-contained golf app for lowering your handicap. You can install 
 | **Hole GPS view** | Full-screen satellite view for the course, turned so the hole runs up the screen. Live yardage to the middle, front and back of the green; drag the target to see the distance to it and on to the green, with the club for each and your shot pattern drawn at the target. Track shots, enter your score and move between holes without leaving the map. |
 | **Plan from home** | Open any mapped course from the library (⛳ Plan) without starting a round: tap where you'd hit it, add the shot, and the next one starts from where it lands, until you reach the green. Drag the ball anywhere to check distances from there. Plans show on the map and the hole card when you play. |
 | **Map any course yourself** | Courses OpenStreetMap doesn't cover can be set up in the hole view from anywhere: search for the course by name, then on the satellite image tap each hole's tee and the middle of its green (and a dogleg bend if it has one). The view turns into the full hole map right away. |
+| **Game plan (auto caddie)** | Add a course from search and it's mapped from OpenStreetMap in the background; where the map has greens and tees but no holes, the holes are worked out from the scorecard's lengths and pars. The caddie then plans every hole shot by shot from your shot pattern, and the Game plan page is the pre-round brief: target score, holes to play safe, chances, club and aim off each tee, hazards with reach and carry. Hand-made plans are never overwritten. |
 | **Rangefinder** | Map mode: tap anywhere for the GPS distance from you (or between two points) with plays-like from wind and slope. Camera mode: line up the top and bottom of the flagstick; the flag's known height gives the distance, and it can be calibrated once for your phone's lens. |
 | **Yardage book** | One printable page per mapped hole: carries over hazards, layup yardages, green depth, your shot plan and tee tip, with room for notes. Print, save as PDF or share as images. |
 | **Plan vs what happened** | After a round, each planned hole is compared with the shots tracked; when you changed club off the tee, the caddie simulation says what that choice cost or saved on average. Course-management summary on the Stats page. |
@@ -94,6 +95,7 @@ public/
   js/yardbook.js      printable yardage book
   js/planreview.js    plan vs what happened, course management
   js/range.js         range mode
+  js/autocaddie.js    auto course prep and the caddie's game plan
   api/courses.js      Vercel serverless course-search proxy
   sw.js               offline cache (service worker)
   manifest.webmanifest, icons/   installable-app metadata

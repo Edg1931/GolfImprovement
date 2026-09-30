@@ -80,6 +80,56 @@ const CourseMap = {
     return { holes, features, pins };
   },
 
+  /* When the map has greens and tees but no hole lines, work out which tee and green make each hole from
+     the scorecard: each hole's length (or a typical length for its par), and the way holes follow on (a
+     green is usually a short walk from the next tee). A beam search keeps the best few hundred partial
+     routings hole by hole. Holes already known (from the map or set by hand) are kept as they are.
+     Adds the holes it finds to data.holes and returns how many. */
+  inferHoles(course, data) {
+    const n = course.pars.length, known = Object.assign({}, (course.map && course.map.holes) || {}, data.holes || {});
+    const isKnown = k => known[k] && known[k].tee && known[k].green;
+    if ([...Array(n)].every((_, i) => isKnown(i + 1))) return 0;
+    const knownGreens = Object.values(known).filter(h => h && h.green).map(h => h.green);
+    const greens = data.features.filter(f => f.type === 'green').map(f => this.pt(this.centroidLL(f.ll)))
+      .filter(g => !knownGreens.some(k => yardsBetween(k, g) < 25));
+    const tees = data.features.filter(f => f.type === 'tee').map(f => this.pt(this.centroidLL(f.ll)));
+    if (!greens.length || !tees.length) return 0;
+    const want = k => {
+      const y = course.yards && course.yards[k - 1], par = course.pars[k - 1];
+      if (y) return { y, lo: y * 0.78 - 10, hi: y + 25 };   // doglegs measure longer than the straight line
+      return par === 3 ? { y: 165, lo: 90, hi: 250 } : par === 5 ? { y: 510, lo: 400, hi: 640 } : { y: 380, lo: 250, hi: 490 };
+    };
+    const cands = {};
+    for (let k = 1; k <= n; k++) {
+      if (isKnown(k)) { cands[k] = [{ fixed: true, tee: known[k].tee, green: known[k].green, gi: -1, cost: 0 }]; continue; }
+      const w = want(k), list = [];
+      tees.forEach(t => greens.forEach((g, gi) => { const d = yardsBetween(t, g); if (d >= w.lo && d <= w.hi) list.push({ tee: t, green: g, gi, cost: Math.abs(d - w.y) / w.y * 10 }); }));
+      cands[k] = list.sort((a, b) => a.cost - b.cost).slice(0, 40);
+    }
+    let beam = [{ cost: 0, used: [], last: null, path: [] }];
+    for (let k = 1; k <= n; k++) {
+      const next = [];
+      beam.forEach(st => {
+        cands[k].forEach(c => {
+          if (c.gi >= 0 && st.used.includes(c.gi)) return;
+          const walk = st.last ? yardsBetween(st.last, c.tee) : 0;
+          next.push({ cost: st.cost + c.cost + Math.max(0, walk - 120) / 60, used: c.gi >= 0 ? st.used.concat(c.gi) : st.used, last: c.green, path: st.path.concat(c) });
+        });
+        next.push({ cost: st.cost + 12, used: st.used, last: st.last, path: st.path.concat(null) });   // leave this hole unmapped
+      });
+      beam = next.sort((a, b) => a.cost - b.cost).slice(0, 250);
+    }
+    const best = beam[0]; let added = 0;
+    data.holes = data.holes || {};
+    best.path.forEach((c, i) => {
+      const k = i + 1; if (!c || c.fixed) return;
+      data.holes[k] = { par: course.pars[k - 1], line: [c.tee, c.green], tee: c.tee, green: c.green, inferred: true };
+      const gf = data.features.find(f => f.type === 'green' && yardsBetween(this.pt(this.centroidLL(f.ll)), c.green) < 1); if (gf) gf.hole = k;
+      added++;
+    });
+    return added;
+  },
+
   centroidLL(ll) { return { lat: ll.reduce((s, p) => s + p.lat, 0) / ll.length, lon: ll.reduce((s, p) => s + p.lon, 0) / ll.length }; },
   /* Feature whose centre is nearest to `p` (or that contains it), within `maxYds`. */
   nearest(list, p, maxYds) {

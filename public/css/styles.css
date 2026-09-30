@@ -928,3 +928,17 @@ body.hv-mode .toast-host { bottom: calc(210px + var(--safe-b)); }
 .fp-seg { flex-wrap: nowrap; }
 .fp-seg button { min-width: 0; padding-left: 2px; padding-right: 2px; font-size: .86rem; }
 .dash-index { display: flex; flex-direction: column; justify-content: space-between; }
+
+/* ---------- Game plan ---------- */
+.gp-list { list-style: none; margin: 0; padding: 0; }
+.gp-list li { display: grid; grid-template-columns: 52px 1fr auto; gap: 12px; align-items: center; padding: 11px 4px; border-bottom: 1px solid var(--border); cursor: pointer; }
+.gp-list li:last-child { border-bottom: 0; }
+.gp-list li:hover { background: var(--surface-2); }
+.gp-no { display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
+.gp-no b { font-size: 1.25rem; }
+.gp-no span { font-size: .72rem; color: var(--text-muted); }
+.gp-body { min-width: 0; }
+.gp-exp { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-muted); }
+.gp-exp.hard { color: var(--red); }
+.gp-exp.easy { color: var(--accent); }
+.focus-list.chances strong { color: var(--accent); }

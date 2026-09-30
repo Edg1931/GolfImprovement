@@ -75,7 +75,7 @@ const Planner = {
     if (s.mode === 'tee' || s.mode === 'green') {
       c.map = c.map || { holes: {}, features: [] };
       const h = c.map.holes[s.hole] = c.map.holes[s.hole] || {};
-      h[s.mode] = CourseMap.pt(p);
+      h[s.mode] = CourseMap.pt(p); h.manual = true;
       if (s.mode === 'green') { c.greens = c.greens || {}; const g = c.greens[s.hole - 1]; if (!g || !g.manual) c.greens[s.hole - 1] = Object.assign({}, CourseMap.greenPins(c, s.hole) || { center: h.green }, { fromMap: true }); }
       if (!c.map.center) c.map.center = CourseMap.pt(p);
       Store.save(); App.toast(`${s.mode === 'tee' ? 'Tee' : 'Green'} set for hole ${s.hole}`); s.mode = 'plan'; this.fit(true); this.drawAll(); this.renderPanel(); return;
@@ -207,7 +207,8 @@ Object.assign(Actions, {
   mapClearTarget() { Planner.s.target = null; Planner.s.recs = null; Planner.drawAll(); Planner.renderPanel(); },
   mapAddStep() {
     const s = Planner.s, c = Planner.course(), r = s.recs && s.recs[s.pick], start = Planner.startPoint(); if (!c || !r || !start) return;
-    c.plans = c.plans || {}; const plan = c.plans[s.hole] = c.plans[s.hole] || [];
+    c.plans = c.plans || {}; if (c.plans[s.hole] && GamePlan.isAuto(c.plans[s.hole])) c.plans[s.hole] = [];
+    const plan = c.plans[s.hole] = c.plans[s.hole] || [];
     plan.push({ club: r.club, start: CourseMap.pt(start), aim: CourseMap.pt(r.aimLL), land: CourseMap.pt(r.landLL), aimShift: Math.round(r.aimShift || 0), expected: r.expected || null });
     if (s.startMode === 'custom') s.startMode = 'tee';
     s.chain = true; s.target = null; s.recs = null; Store.save(); Planner.drawAll(); Planner.renderPanel();

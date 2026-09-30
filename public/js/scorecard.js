@@ -148,7 +148,7 @@ function playSetup() {
     ${idx != null ? `<p class="tiny muted mb0">Your index ${fmt1(idx)} is used for net scoring and the net-double-bogey cap.${mode !== '18' ? ' Nine-hole scores count toward your index using the World Handicap System’s expected-score rule.' : ''}</p>` : `<p class="tiny muted mb0">No index yet: holes are capped at par + 5 until you have 3 rounds.${mode !== '18' ? ' Nine-hole rounds start counting once you have an index.' : ''}</p>`}
   </form></div></div>
   <div><div class="card"><div class="card-head"><h3>Course library</h3><span class="small muted">${courses.length}</span></div>
-      ${courses.length ? `<ul class="list compact">${courses.map(x => `<li class="row-between"><div><span class="tee-swatch" style="background:${teeColor(x.tees)}"></span> <strong>${escapeHtml(x.name)}</strong> <span class="small muted">${escapeHtml(x.tees || '')} · ${x.rating}/${x.slope} · par ${sum(x.pars)}${x.pars.length === 9 ? ' · 9 holes' : ''}</span></div><span class="nowrap"><button class="btn sm" data-action="openHoleView" data-id="${x.id}" data-hole="1" title="Plan your shots hole by hole">Plan</button><button class="btn sm ghost" data-action="openYardbook" data-id="${x.id}" title="Yardage book">Book</button><button class="btn sm ghost" data-action="openCourseMap" data-id="${x.id}" title="Course map">Map</button><button class="btn sm ghost danger" data-action="deleteCourse" data-id="${x.id}" aria-label="Delete course">✕</button></span></li>`).join('')}</ul>` : '<div class="empty small">Courses you find or enter are saved here, and they work offline.</div>'}
+      ${courses.length ? `<ul class="list compact">${courses.map(x => `<li class="row-between"><div><span class="tee-swatch" style="background:${teeColor(x.tees)}"></span> <strong>${escapeHtml(x.name)}</strong> <span class="small muted">${escapeHtml(x.tees || '')} · ${x.rating}/${x.slope} · par ${sum(x.pars)}${x.pars.length === 9 ? ' · 9 holes' : ''}</span></div><span class="nowrap"><button class="btn sm" data-action="openGamePlan" data-id="${x.id}" title="Your caddie's plan for every hole">Game plan</button><button class="btn sm ghost" data-action="openHoleView" data-id="${x.id}" data-hole="1" title="See and plan each hole">Holes</button><button class="btn sm ghost" data-action="openYardbook" data-id="${x.id}" title="Yardage book">Book</button><button class="btn sm ghost danger" data-action="deleteCourse" data-id="${x.id}" aria-label="Delete course">✕</button></span></li>`).join('')}</ul>` : '<div class="empty small">Courses you find or enter are saved here, and they work offline.</div>'}
     </div>
   </div></div>`;
   return html;
@@ -391,7 +391,8 @@ Object.assign(Actions, {
     const existing = App.state.courses.find(x => x.extId === course.extId && x.tees === course.tees);
     if (existing) Object.assign(existing, course, { id: existing.id }); else App.state.courses.push(course);
     App.ui.playCourse = (existing || course).id; App.ui.cs = null; Store.save(); App.render();
-    App.toast(`${course.name} (${course.tees}) added to your library`);
+    App.toast(`${course.name} (${course.tees}) added. Your caddie is mapping it…`);
+    AutoCaddie.afterAdd(existing || course);   // map it and plan every hole in the background
   },
   deleteCourse(el) { if (!confirm('Remove this course from your library?')) return; App.state.courses = App.state.courses.filter(c => c.id !== el.dataset.id); Store.tombstone(el.dataset.id); if (App.ui.playCourse === el.dataset.id) App.ui.playCourse = null; Store.save(); App.render(); },
   viewCard(el) { const r = App.rounds().find(x => x.id === el.dataset.id); if (r) App.modal(roundCardModal(r)); },
@@ -469,6 +470,9 @@ Object.assign(Forms, {
     App.state.liveRound = Object.assign(lr, { id: uid(), date: v.date, courseId, course: full.name, tees: full.tees, mode, first, yards: take(full.yards), cur: 0,
       holes: lpars.map(() => ({ strokes: null, putts: null, fir: null, pen: 0, sand: false })) });
     Group.attach(App.state.liveRound, v, rs);
+    // no plan yet for this course: have the caddie map and plan it now
+    const pc = courseId && App.state.courses.find(c => c.id === courseId);
+    if (pc && !(pc.plans && Object.keys(pc.plans).length)) setTimeout(() => AutoCaddie.prepare(pc), 0);
     App.ui.gps = null; Store.save(); App.render(); App.toast('Round started. Good luck out there!');
   },
 });

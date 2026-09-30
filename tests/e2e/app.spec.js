@@ -613,3 +613,61 @@ test('yardage book pages and plan vs what happened', async ({ page, context }) =
   await page.goto('/#/stats'); await expect(page.locator('.card', { hasText: 'Course management' })).toContainText('Stuck to the plan');
   expect(errs).toEqual([]);
 });
+
+/* ---------- the caddie maps and plans a course before you play it ---------- */
+test('holes are worked out from tees, greens and the scorecard when the map has no hole lines', async ({ page }) => {
+  const errs = trackErrors(page); await withDemo(page);
+  const res = await page.evaluate(({ o }) => {
+    const pr = Caddie.projector(o), ll = (x, y) => pr.toLL({ x, y });
+    const box = (x, y, r) => [ll(x - r, y - r), ll(x + r, y - r), ll(x + r, y + r), ll(x - r, y + r)];
+    // a 4-hole loop: 1 north 380, 2 east 165, 3 south 510, 4 west-ish back 400; extra tee boxes and a practice green
+    const T = [[0, 0], [30, 395], [215, 400], [250, -110]], G = [[0, 380], [195, 400], [230, -100], [-120, 60]];
+    const features = [...T.map(([x, y]) => ({ type: 'tee', ll: box(x, y, 6) })), { type: 'tee', ll: box(10, -15, 5) }, { type: 'tee', ll: box(40, 420, 5) },
+      ...G.map(([x, y]) => ({ type: 'green', ll: box(x, y, 14) })), { type: 'green', ll: box(-40, -30, 10) }];
+    const course = { id: 'x', name: 'Loop', pars: [4, 3, 5, 4], yards: [380, 165, 510, 400], si: [1, 2, 3, 4] };
+    const data = { holes: {}, features };
+    const added = CourseMap.inferHoles(course, data);
+    const near = (p, q) => yardsBetween(p, ll(q[0], q[1])) < 12;
+    return { added, ok: [1, 2, 3, 4].map(k => data.holes[k] && near(data.holes[k].tee, T[k - 1]) && near(data.holes[k].green, G[k - 1])) };
+  }, { o: fx.ORIGIN });
+  expect(res.added).toBe(4); expect(res.ok).toEqual([true, true, true, true]);
+  expect(errs).toEqual([]);
+});
+
+test('adding a course maps it and writes a game plan for every hole, before you play @phone', async ({ page, context }) => {
+  const errs = trackErrors(page); await mapFixtures(context); await weatherFixtures(context);
+  // OpenStreetMap has greens, tees and hazards for this course but no hole lines: the holes come from the scorecard
+  const noHoles = { ...fx.json, elements: fx.json.elements.filter(e => !(e.tags && e.tags.golf === 'hole')).concat([{ type: 'way', id: 900, tags: { golf: 'tee' }, geometry: [fx.ll(55, 395), fx.ll(65, 395), fx.ll(65, 405), fx.ll(55, 405), fx.ll(55, 395)] }]) };
+  await context.route('**/api/interpreter', r => r.fulfill({ contentType: 'application/json', body: JSON.stringify(noHoles) }));
+  const api = require('../../api/courses.js');
+  const yards = [382, 165, ...Array(16).fill(400)], pars = [4, 3, ...Array(16).fill(4)];
+  const course = { id: 1, club_name: 'Seaside Links', location: { city: 'Monterey', state: 'CA', latitude: fx.ORIGIN.lat + 0.001, longitude: fx.ORIGIN.lon }, tees: { male: [{ tee_name: 'White', course_rating: 71.2, slope_rating: 128, total_yards: 6800, par_total: 72, number_of_holes: 18, holes: yards.map((y, i) => ({ par: pars[i], yardage: y, handicap: i + 1 })) }] } };
+  const summary = { ...course, id: 'sl1', tees: { male: 1, female: 0 } };
+  await context.route('**/api/courses*', r => { const u = new URL(r.request().url()); r.fulfill({ contentType: 'application/json', body: JSON.stringify(u.searchParams.get('id') ? { course: api.normalizeCourse({ ...course, id: 'sl1' }) } : { courses: [api.normalizeCourse(summary)] }) }); });
+  await withDemo(page);
+  await page.goto('/#/play');
+  await page.fill('input[name=q]', 'seaside'); await page.click('.search-row button');
+  await page.click('.tee-opt');
+  await expect(page.locator('.toast').last()).toContainText('2 of 18 holes mapped, game plan ready', { timeout: 15000 });
+  const c = await page.evaluate(() => { const c = App.state.courses.find(x => x.name === 'Seaside Links'); return { plans: c.plans, holes: Object.keys(c.map.holes), inferred: c.prep.inferred }; });
+  expect(c.holes.sort()).toEqual(['1', '2']); expect(c.inferred).toBe(2);
+  expect(c.plans[1].length).toBeGreaterThanOrEqual(2); expect(c.plans[1].every(s => s.auto)).toBe(true);
+  expect(c.plans[2]).toHaveLength(1);   // a par 3: one shot to the green
+  // the pre-round brief
+  await page.locator('li', { hasText: 'Seaside Links' }).locator('[data-action=openGamePlan]').click();
+  await expect(page.locator('.gp-list li')).toHaveCount(18);
+  await expect(page.locator('.gp-list li').first()).toContainText('→');
+  await expect(page.locator('.gp-list li').first()).toContainText('Water left');
+  await expect(page.locator('.card', { hasText: 'Target score' })).toBeVisible();
+  // the plan shows on the hole, and planning it yourself replaces the caddie's
+  await page.locator('.gp-list li').first().click();
+  await expect(page.locator('.hv-step')).toHaveCount(c.plans[1].length);
+  await page.click('[data-action=hvAddShot]');
+  const mine = await page.evaluate(() => App.state.courses.find(x => x.name === 'Seaside Links').plans[1]);
+  expect(mine).toHaveLength(1); expect(mine[0].auto).toBeFalsy();
+  // re-planning keeps the hand-made plan
+  await page.goto('/#/gameplan'); await page.click('[data-action=gpPrepare]');
+  await expect(page.locator('.toast').last()).toContainText('Planned');
+  expect(await page.evaluate(() => App.state.courses.find(x => x.name === 'Seaside Links').plans[1][0].auto)).toBeFalsy();
+  expect(errs).toEqual([]);
+});

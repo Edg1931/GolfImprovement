@@ -141,7 +141,7 @@ const HoleView = {
     const inside = (c.map.features || []).filter(f => f.type === 'green').find(f => { const pr = Caddie.projector(p); return Caddie.pointInPolygon({ x: 0, y: 0 }, f.ll.map(pr.toXY)); });
     const g = inside ? CourseMap.pt(CourseMap.centroidLL(inside.ll)) : CourseMap.pt(p);
     if (yardsBetween(mh.tee, g) < 60) { App.toast('That’s very close to the tee. Tap the middle of this hole’s green.'); return; }
-    mh.green = g; mh.line = [mh.tee, g];
+    mh.green = g; mh.line = [mh.tee, g]; mh.manual = true;
     if (!mh.par) mh.par = c.pars[h.n - 1];
     c.greens = c.greens || {};
     const old = c.greens[h.n - 1]; if (!old || !old.manual) c.greens[h.n - 1] = Object.assign({}, CourseMap.greenPins(c, h.n) || { center: g }, { fromMap: true });
@@ -785,7 +785,8 @@ Object.assign(Actions, {
     const tgt = HoleView.s.target || h.flag; if (!b || !tgt || !club) return;
     let aimShift = 0, expected = null;
     try { const cmp = HoleView.compare(); const r = cmp && cmp.recs.find(x => x.club === club.club); if (r && cmp.mapped) { aimShift = Math.round(r.aimShift || 0); expected = r.expected; } } catch (e) { /* advice is optional */ }
-    const c = h.c; c.plans = c.plans || {}; const plan = c.plans[h.n] = c.plans[h.n] || [];
+    const c = h.c; c.plans = c.plans || {}; if (c.plans[h.n] && GamePlan.isAuto(c.plans[h.n])) c.plans[h.n] = [];   // your plan replaces the caddie's
+    const plan = c.plans[h.n] = c.plans[h.n] || [];
     plan.push({ club: club.club, start: CourseMap.pt(b.pos), aim: CourseMap.pt(tgt), land: CourseMap.pt(tgt), aimShift, expected });
     Store.save();
     const s = HoleView.s; s.club = null;
