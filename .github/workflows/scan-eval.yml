@@ -5,6 +5,7 @@ name: Course scan training
 on:
   push:
     paths:
+      - 'lib/scan.js'
       - 'tests/scan-eval/**'
       - '.github/workflows/scan-eval.yml'
   workflow_dispatch:
