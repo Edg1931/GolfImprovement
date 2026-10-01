@@ -68,6 +68,7 @@ async function handler(req, res) {
   const known = {};
   if (input.known && typeof input.known === 'object') Object.entries(input.known).slice(0, 27).forEach(([k, h]) => { if (h && ll(h.tee) && ll(h.green)) known[k] = { tee: ll(h.tee), green: ll(h.green) }; });
 
+  if (!scan.ready()) return send(503, { error: 'not_ready' });
   const t0 = Date.now();
   try {
     const plan = scan.tilePlan({ lat, lon }, radius, 17, 144);

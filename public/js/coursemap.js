@@ -167,7 +167,7 @@ const CourseMap = {
   apply(course, data, source) {
     const map = course.map || { holes: {}, features: [] };
     Object.entries(data.holes || {}).forEach(([n, h]) => { map.holes[n] = Object.assign({}, map.holes[n], h); });
-    map.features = (source === 'osm' ? map.features.filter(f => f.source !== 'osm') : map.features).concat((data.features || []).map(f => ({ ...f, source })));
+    map.features = (source === 'osm' || source === 'scan' ? map.features.filter(f => f.source !== source) : map.features).concat((data.features || []).map(f => ({ ...f, source })));
     map.center = data.center || map.center || this.guessCenter(map);
     map.source = source; map.updated = todayISO();
     course.map = map;

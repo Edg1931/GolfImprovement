@@ -1,18 +1,21 @@
-name: Course scan check
+name: Course scan training
 
+# Teaches the course scan from courses traced on OpenStreetMap, saves the model to lib/scan-model.json
+# on this branch, then checks hole by hole how well it does.
 on:
   push:
     paths:
-      - 'lib/scan.js'
-      - 'api/scan.js'
       - 'tests/scan-eval/**'
       - '.github/workflows/scan-eval.yml'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  check:
+  train:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,5 +23,15 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Scan courses that OpenStreetMap has mapped and compare
+      - name: Train
+        run: node tests/scan-eval/train.js
+      - name: Check on real courses
         run: node tests/scan-eval/eval.js
+      - name: Save the model
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898+github-actions[bot]@users.noreply.github.com"
+          git add lib/scan-model.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Course scan: retrained model"
+          git push origin HEAD:${GITHUB_REF_NAME}

@@ -89,7 +89,7 @@ const AutoCaddie = {
     if (!course || this.busy[course.id]) return null;
     this.busy[course.id] = true;
     const say = t => { if (opts.onStatus) opts.onStatus(t); };
-    const out = { mapped: 0, inferred: 0, planned: 0, error: null };
+    const out = { mapped: 0, inferred: 0, scanned: 0, planned: 0, error: null };
     try {
       const center = course.geo || (course.map && course.map.center);
       const need = this.mapped(course) < course.pars.length;
@@ -104,6 +104,11 @@ const AutoCaddie = {
           course.prep = Object.assign({}, course.prep, { osm: todayISO() });
         } catch (e) { out.error = navigator.onLine ? 'The map service is busy right now.' : 'You are offline.'; }
       }
+      // holes still missing: scan the satellite photo for them
+      if (center && navigator.onLine && this.mapped(course) < course.pars.length && !(course.prep && course.prep.scan && !opts.force)) {
+        say('Scanning the satellite photo…');
+        try { out.scanned = await this.scan(course, center); } catch (e) { /* the map service is busy: the player can still map it by hand */ }
+      }
       out.mapped = this.mapped(course);
       if (out.mapped) { say('Planning every hole…'); out.planned = await GamePlan.course(course, n => say(`Planning hole ${n}…`)); }
       course.prep = Object.assign({}, course.prep, { at: todayISO(), mapped: out.mapped, inferred: (course.prep && course.prep.inferred || 0) + out.inferred });
@@ -112,13 +117,35 @@ const AutoCaddie = {
     return out;
   },
 
+  /* Ask the server to find the greens, tees, bunkers and water on the satellite photo and match them to
+     the scorecard. Holes from OpenStreetMap or set by hand are passed along and kept as they are. */
+  async scan(course, center) {
+    const holesOf = () => (course.map && course.map.holes) || {}, known = {};
+    course.pars.forEach((_, i) => { const h = holesOf()[i + 1]; if (h && h.tee && h.green && !h.scanned) known[i + 1] = { tee: h.tee, green: h.green }; });
+    const r = await fetch('/api/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lat: center.lat, lon: center.lon, pars: course.pars, yards: course.yards || null, known }) });
+    if (!r.ok) return 0;
+    const s = await r.json(), holes = {};
+    Object.entries(s.holes || {}).forEach(([k, h]) => {
+      const mh = holesOf()[k]; if (mh && (mh.manual || (mh.tee && mh.green && !mh.scanned))) return;
+      holes[k] = { par: course.pars[k - 1], line: [h.tee, h.green], tee: h.tee, green: h.green, scanned: true };
+    });
+    // skip anything the map already has
+    const have = ((course.map && course.map.features) || []).filter(f => f.source !== 'scan');
+    const features = (s.features || []).filter(f => !have.some(e => e.type === f.type && yardsBetween(CourseMap.centroidLL(e.ll), CourseMap.centroidLL(f.ll)) < 15));
+    if (Object.keys(holes).length || features.length) { CourseMap.apply(course, { holes, features }, 'scan'); if (!course.map.center) course.map.center = CourseMap.pt(center); }
+    const n = Object.values(holesOf()).filter(h => h.scanned && !h.manual).length;
+    course.prep = Object.assign({}, course.prep, { scan: todayISO(), scanned: n });
+    return Object.keys(holes).length;
+  },
+
   /* After a course is added from search: prepare it in the background and say what happened. */
   async afterAdd(course) {
     const res = await this.prepare(course);
     if (!res) return;
     const n = course.pars.length;
-    if (res.mapped) App.toast(`${course.name}: ${res.mapped === n ? 'all ' + n : res.mapped + ' of ' + n} holes mapped, game plan ready`);
-    else if (!res.error) App.toast(`${course.name} isn’t on OpenStreetMap yet. Tap Plan to map it yourself in a few minutes.`);
+    if (res.mapped) App.toast(`${course.name}: ${res.mapped === n ? 'all ' + n : res.mapped + ' of ' + n} holes mapped${res.scanned ? ` (${res.scanned} from the satellite photo)` : ''}, game plan ready`);
+    else if (!res.error) App.toast(`Couldn’t find ${course.name}’s holes on the map. Open a hole to set its tee and green: about 10 seconds a hole.`);
     if (App.route() === 'play' || App.route() === 'gameplan') App.render();
   },
 };
@@ -146,7 +173,7 @@ Views.gameplan = function () {
   let html = `<div class="page-head"><div><h1>Game plan</h1><p class="muted">Your caddie's plan for every hole, from your own shot pattern.</p></div>
     <div class="btn-row"><button class="btn primary" data-action="gpPrepare" ${busy ? 'disabled' : ''}>${busy ? 'Working…' : mapped ? 'Re-plan' : 'Map and plan'}</button><button class="btn" data-action="openYardbook" data-id="${c.id}" ${mapped ? '' : 'disabled'}>Yardage book</button></div></div>
     <div class="map-bar"><select data-change="gpCourse" aria-label="Course">${courses.map(x => `<option value="${x.id}" ${x.id === c.id ? 'selected' : ''}>${escapeHtml(x.name)}${x.tees ? ' · ' + escapeHtml(x.tees) : ''}</option>`).join('')}</select></div>
-    <p class="small muted mt" id="gpStatus">${busy ? 'Working…' : mapped ? `${mapped} of ${n} holes mapped${c.prep && c.prep.inferred ? ` (${c.prep.inferred} worked out from the scorecard)` : ''}.${stale ? ' You’ve tracked shots since this plan: re-plan to use them.' : ''}` : ''}</p>`;
+    <p class="small muted mt" id="gpStatus">${busy ? 'Working…' : mapped ? `${mapped} of ${n} holes mapped${c.prep && c.prep.scanned ? ` (${c.prep.scanned} found on the satellite photo: check them on the map)` : c.prep && c.prep.inferred ? ` (${c.prep.inferred} worked out from the scorecard)` : ''}.${stale ? ' You’ve tracked shots since this plan: re-plan to use them.' : ''}` : ''}</p>`;
   if (!mapped) {
     return html + `<div class="card mt"><h3>No map yet</h3><p class="small muted">${c.geo || (c.map && c.map.center) ? 'Tap <strong>Map and plan</strong> to load the course from OpenStreetMap.' : 'This course has no location yet.'} If it isn't mapped there, set each hole's tee and green on the satellite image. It takes about 10 seconds a hole.</p>
       <button class="btn" data-action="openHoleView" data-id="${c.id}" data-hole="1">Map it myself</button></div>`;
