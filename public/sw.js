@@ -1,6 +1,6 @@
 /* Offline support: app shell is cached on install; everything else is served
    network-first and cached as it is fetched, so the app works on the course with no signal. */
-const CACHE = 'fairwaylab-v16';
+const CACHE = 'fairwaylab-v17';
 const TILES = 'fairwaylab-tiles';   // satellite imagery: kept across app updates
 const SHELL = [
   './', 'index.html', 'css/styles.css', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png',

@@ -80,6 +80,9 @@ const GamePlan = {
 };
 
 const AutoCaddie = {
+  /* Filling holes from the satellite scan stays off until the scan gets holes right on courses it
+     wasn't trained on (tests/scan-eval reports it); the player maps those holes by hand meanwhile. */
+  SCAN_HOLES: false,
   busy: {},
   mapped(course) { return course.pars.map((_, i) => i + 1).filter(n => { const h = CourseMap.holeInfo(course, n); return h.tee && h.green; }).length; },
 
@@ -94,7 +97,7 @@ const AutoCaddie = {
       const center = course.geo || (course.map && course.map.center);
       const need = this.mapped(course) < course.pars.length;
       // start the satellite scan straight away, alongside OpenStreetMap, rather than one after the other
-      const wantScan = need && center && navigator.onLine && !(course.prep && course.prep.scan && !opts.force);
+      const wantScan = AutoCaddie.SCAN_HOLES && need && center && navigator.onLine && !(course.prep && course.prep.scan && !opts.force);
       const scanP = wantScan ? this.scanFetch(course, center).catch(() => null) : null;
       if (need && center && navigator.onLine && !(course.prep && course.prep.osm && !opts.force)) {
         say('Mapping the course…');
