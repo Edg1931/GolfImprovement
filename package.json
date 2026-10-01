@@ -2,8 +2,11 @@
   "name": "fairway-lab",
   "private": true,
   "description": "Fairway Lab golf improvement app. Static site in public/, serverless functions in api/.",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.128.0"
+    "@anthropic-ai/sdk": "^0.128.0",
+    "jpeg-js": "^0.4.4"
   }
 }
