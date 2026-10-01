@@ -66,7 +66,7 @@ function train(X, Y, opts) {
   const P = ['W1', 'b1', 'W2', 'b2'], mom = {}, vel = {};
   P.forEach(k => { mom[k] = new Float32Array(m[k].length); vel[k] = new Float32Array(m[k].length); });
   const lr = opts.lr, b1 = 0.9, b2 = 0.999; let t = 0;
-  const idx = [...Array(N).keys()];
+  const idx = [...Array(N).keys()], dz = new Float32Array(K), dh = new Float32Array(H);
   for (let ep = 0; ep < opts.epochs; ep++) {
     for (let i = N - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
     let loss = 0;
@@ -77,8 +77,8 @@ function train(X, Y, opts) {
         const i = idx[r], x = Z[i], y = Y[i], wgt = cw[y] / bs;
         const { hid, p } = scan.forward(m, x);
         loss -= Math.log(Math.max(1e-9, p[y])) * cw[y];
-        const dz = new Float32Array(K); for (let c = 0; c < K; c++) dz[c] = (p[c] - (c === y ? 1 : 0)) * wgt;
-        const dh = new Float32Array(H);
+        for (let c = 0; c < K; c++) dz[c] = (p[c] - (c === y ? 1 : 0)) * wgt;
+        dh.fill(0);
         for (let c = 0; c < K; c++) { g.b2[c] += dz[c]; for (let j = 0; j < H; j++) { g.W2[c * H + j] += dz[c] * hid[j]; dh[j] += dz[c] * m.W2[c * H + j]; } }
         for (let j = 0; j < H; j++) { if (hid[j] <= 0) continue; g.b1[j] += dh[j]; for (let q = 0; q < NF; q++) g.W1[j * NF + q] += dh[j] * x[q]; }
       }
