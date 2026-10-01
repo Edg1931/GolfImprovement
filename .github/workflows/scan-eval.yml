@@ -28,8 +28,10 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Train
+        if: ${{ !contains(github.event.head_commit.message, '[check only]') }}
         run: node tests/scan-eval/train.js
       - name: Save the model
+        if: ${{ !contains(github.event.head_commit.message, '[check only]') }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898+github-actions[bot]@users.noreply.github.com"

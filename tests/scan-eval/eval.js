@@ -42,6 +42,18 @@ const lineYds = ll => ll.slice(1).reduce((s, p, i) => s + scan.yardsBetween(ll[i
         if (dg < 20) greenOk++;
         if (dg < 20 && dt < 45) ok++; else wrong++;
       }
+      // why holes go wrong: are the true greens and tees among the candidates, how do they rank, and
+      // how does the scan's choice compare with the true green
+      const rank = (list, p, d) => { const sorted = list.slice().sort((a, b) => a.cost - b.cost); const i = sorted.findIndex(x => scan.yardsBetween(x, p) < d); return i; };
+      const diag = [];
+      for (let i = 1; i <= n; i++) {
+        const t = holes[i]; if (!t) continue;
+        const gr = rank(res.greens, t.green, 15), tr = rank(res.tees, t.tee, 25), got = res.holes[i];
+        const gotG = got ? res.greens.slice().sort((a, b) => a.cost - b.cost).findIndex(x => scan.yardsBetween(x, got.green) < 2) : -2;
+        diag.push({ gr, tr, gotG, line: Math.round(scan.yardsBetween(t.tee, t.green)), yds: t.yards, off: got ? Math.round(scan.yardsBetween(got.green, t.green)) : null });
+      }
+      const med = a => { const s2 = a.filter(v => v >= 0).sort((x, y) => x - y); return s2.length ? s2[s2.length >> 1] : '-'; };
+      rows.push(`   greens found ${diag.filter(d => d.gr >= 0).length}/${diag.length} (median rank ${med(diag.map(d => d.gr))}), tees found ${diag.filter(d => d.tr >= 0).length}/${diag.length} (median rank ${med(diag.map(d => d.tr))}), chosen green median rank ${med(diag.map(d => d.gotG))}, scorecard vs straight line ${diag.slice(0, 4).map(d => d.yds + '/' + d.line).join(' ')}, chosen green off by ${diag.slice(0, 6).map(d => d.off).join(' ')} yds`);
       const T = tot[held ? 'held' : 'train']; T[0] += ok; T[1] += wrong; T[2] += skip; T[3] += nums.filter(i => i <= n).length;
       rows.push(`${name}${held ? ' (held back)' : ''}: ${ok}/${nums.length} right, ${wrong} wrong (${greenOk} right green), ${skip} left out | greens found ${recall}/${near.length} among ${res.found.greens}, ${res.found.tees} tees, ${res.found.bunkers} bunkers, ${res.found.water} water | ${img.tiles} tiles, fetch ${tf} ms, total ${ms} ms`);
     } catch (e) { rows.push(`${name}: error ${e.message}`); }
