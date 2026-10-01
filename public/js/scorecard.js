@@ -178,21 +178,21 @@ function playLive(lr) {
     <div class="row-between"><div><p class="eyebrow">Hole ${no(i)}${n === 9 ? ` · ${i + 1} of 9` : ' of 18'}</p><h2 class="hole-title">Par ${par} <span class="muted">· ${lr.yards && lr.yards[i] ? lr.yards[i] + ' yds · ' : ''}SI ${cardSi[i]}</span></h2></div>${rec > 0 ? `<span class="badge">${'●'.repeat(Math.min(rec, 3))} ${rec} stroke${rec > 1 ? 's' : ''}</span>` : ''}</div>
     ${lr.courseId ? '<button class="btn primary block hv-open" data-action="openHoleView">Open hole view</button>' : ''}
 
-    ${caddieHintHtml(lr)}
+    ${caddieHintHtml(lr)}${shotSummary(h, par)}
     <div class="entry"><div class="entry-label">Score</div>
       <div class="stepper"><button class="step" data-action="holeStep" data-k="strokes" data-d="-1" aria-label="One fewer stroke">−</button><output class="step-val ${scoreClass(h.strokes, par)}">${h.strokes != null ? h.strokes : '–'}</output><button class="step" data-action="holeStep" data-k="strokes" data-d="1" aria-label="One more stroke">+</button></div>
       <div class="chip-row">${quick.map(v => `<button class="chip ${h.strokes === v ? 'active' : ''}" data-action="holeSet" data-k="strokes" data-v="${v}">${scoreName(v, par)}</button>`).join('')}</div></div>
 
-    <div class="entry"><div class="entry-label">Putts</div>
+    <div class="entry"><div class="entry-label">Putts${autoTag(h, 'putts')}</div>
       <div class="seg">${[0, 1, 2, 3, 4].map(v => `<button class="${h.putts === v ? 'active' : ''}" data-action="holeSet" data-k="putts" data-v="${v}">${v}${v === 4 ? '+' : ''}</button>`).join('')}</div></div>
     ${firstPuttEntry(h)}
 
-    ${par >= 4 ? `<div class="entry"><div class="entry-label">Tee shot</div>
+    ${par >= 4 ? `<div class="entry"><div class="entry-label">Tee shot${autoTag(h, 'fir')}</div>
       <div class="seg">${FAIRWAY_OPTS.map(([v, l]) => `<button class="${h.fir === v ? 'active' : ''}" data-action="holeSet" data-k="fir" data-v="${v}">${l}</button>`).join('')}</div></div>` : ''}
 
-    <div class="entry two"><div><div class="entry-label">Penalties</div>
+    <div class="entry two"><div><div class="entry-label">Penalties${autoTag(h, 'pen')}</div>
       <div class="stepper sm"><button class="step" data-action="holeStep" data-k="pen" data-d="-1" aria-label="Remove penalty">−</button><output class="step-val">${h.pen || 0}</output><button class="step" data-action="holeStep" data-k="pen" data-d="1" aria-label="Add penalty">+</button></div></div>
-      <div><div class="entry-label">Greenside bunker</div><button class="toggle ${h.sand ? 'on' : ''}" data-action="holeToggleSand" aria-pressed="${!!h.sand}"><span></span>${h.sand ? 'Yes' : 'No'}</button></div></div>
+      <div><div class="entry-label">Greenside bunker${autoTag(h, 'sand')}</div><button class="toggle ${h.sand ? 'on' : ''}" data-action="holeToggleSand" aria-pressed="${!!h.sand}"><span></span>${h.sand ? 'Yes' : 'No'}</button></div></div>
 
     <div class="btn-row nav-row"><button class="btn" data-action="holeGo" data-i="${i - 1}" ${i === 0 ? 'disabled' : ''}>‹ Prev</button>
       ${i < last ? `<button class="btn primary lg grow" data-action="holeGo" data-i="${i + 1}">Next hole ›</button>` : `<button class="btn primary lg grow" data-action="finishRound" ${complete ? '' : 'disabled'}>${lr.editingId ? 'Save changes ✓' : 'Finish round ✓'}</button>`}</div>
@@ -239,6 +239,17 @@ function updateGreenYards() {
 }
 
 /* Compact scorecard table: two nines for 18 holes, one for a nine-hole round (first = 0 or 9). */
+/* Marks a hole stat that was filled in from tracked shots, and a line saying what the shots showed. */
+function autoTag(h, k) { return h.auto && h.auto[k] ? ' <span class="auto-tag">from your shots</span>' : ''; }
+function shotSummary(h, par) {
+  if (!h.shots || !h.shots.length) return '';
+  const bits = [];
+  if (h.toGreen != null) bits.push(`on the green in ${h.toGreen}${h.girShots ? ' · green in regulation ✓' : ''}`);
+  if (par >= 4 && h.auto && h.auto.fir) bits.push(h.fir === 'hit' ? 'fairway hit' : `missed the fairway ${h.fir}`);
+  if (h.auto && h.auto.pen && h.pen) bits.push(`${h.pen} penalt${h.pen === 1 ? 'y' : 'ies'}`);
+  return bits.length ? `<p class="small shot-sum">${h.shots.length} tracked shot${h.shots.length === 1 ? '' : 's'}: ${bits.join(' · ')}.${h.toGreen != null && h.strokes == null ? ' Tap your putts and the score fills in.' : ''}</p>` : '';
+}
+
 /* First-putt distance, for putting strokes gained. Filled in automatically when a tracked approach finishes on the green. */
 const FIRST_PUTT_FT = [3, 6, 10, 15, 20, 30, 45, 60];
 function firstPuttEntry(h) {
@@ -322,19 +333,26 @@ Object.assign(Actions, {
     App.haptic();
     const lr = App.state.liveRound; const h = lr.holes[lr.cur]; const k = el.dataset.k;
     const v = k === 'fir' ? el.dataset.v : parseInt(el.dataset.v, 10);
-    h[k] = h[k] === v && k !== 'strokes' && !(k === 'firstPutt' && h.fpAuto) ? null : v;
+    const wasAuto = h.auto && h.auto[k];
+    h[k] = h[k] === v && k !== 'strokes' && !wasAuto && !(k === 'firstPutt' && h.fpAuto) ? null : v;
     if (k === 'firstPutt') h.fpAuto = false;
+    if (k !== 'strokes') h.set = Object.assign({}, h.set, { [k]: true });
+    // tracked shots reached the green: entering putts gives the score
+    if (k === 'putts' && h.putts != null && h.toGreen != null && (h.strokes == null || (h.auto && h.auto.strokes))) { h.strokes = h.toGreen + h.putts; SG.autoFill(lr, lr.cur); h.auto.strokes = true; }
+    else SG.autoFill(lr, lr.cur);
     if (k === 'putts' && h.strokes != null && h.putts != null && h.putts >= h.strokes) h.strokes = h.putts + 1;
     Store.save(); App.render();
   },
   holeStep(el) {
     App.haptic();
     const lr = App.state.liveRound; const h = lr.holes[lr.cur]; const k = el.dataset.k; const d = parseInt(el.dataset.d, 10);
-    if (k === 'strokes') h.strokes = h.strokes == null ? lr.pars[lr.cur] : Math.max(1, Math.min(15, h.strokes + d));
-    else h[k] = Math.max(0, Math.min(9, (h[k] || 0) + d));
+    if (k === 'strokes') h.strokes = h.strokes == null ? (h.toGreen != null ? h.toGreen + 2 : lr.pars[lr.cur]) : Math.max(1, Math.min(15, h.strokes + d));
+    else { h[k] = Math.max(0, Math.min(9, (h[k] || 0) + d)); h.set = Object.assign({}, h.set, { [k]: true }); }
+    if (k === 'strokes' && h.auto) h.auto.strokes = false;
+    SG.autoFill(lr, lr.cur);
     Store.save(); App.render();
   },
-  holeToggleSand() { const lr = App.state.liveRound; const h = lr.holes[lr.cur]; h.sand = !h.sand; Store.save(); App.render(); },
+  holeToggleSand() { const lr = App.state.liveRound; const h = lr.holes[lr.cur]; h.sand = !h.sand; h.set = Object.assign({}, h.set, { sand: true }); Store.save(); App.render(); },
   discardRound() { if (!confirm('Discard this round? Scores entered so far will be lost.')) return; App.state.liveRound = null; App.ui.gps = null; App.keepAwake(false); Store.save(); App.render(); },
   finishRound() {
     const lr = App.state.liveRound; if (!lr || lr.holes.some(h => h.strokes == null)) return;
@@ -360,6 +378,8 @@ Object.assign(Actions, {
       ${nine ? `<div class="callout small">${r.diff18 != null ? `Nine-hole score converted to an 18-hole differential of <strong>${fmt1(r.diff18)}</strong> using your expected score for the other nine.` : 'Nine-hole rounds count toward your index once you have one (3 full rounds).'}</div>` : ''}
       ${r.score !== r.grossScore ? `<div class="callout info small">Adjusted to <strong>${r.score}</strong> for handicap (holes capped at net double bogey).</div>` : ''}
       <div class="stat-row mb">${statBox('Differential', fmt1(r.diff))}${statBox('Index', idx != null ? fmt1(idx) : '—', prevIdx != null && idx != null && idx !== prevIdx ? (idx < prevIdx ? '▼ ' : '▲ ') + fmt1(Math.abs(idx - prevIdx)) : '')}${statBox('Putts', r.putts ?? '—')}${statBox('GIR', r.gir ?? '—')}</div>
+      <div class="stat-row mb">${statBox('Fairways', r.firHit != null ? `${r.firHit}/${r.firPossible}` : '—')}${statBox('Up & downs', r.udAtt ? `${r.udMade}/${r.udAtt}` : '—')}${statBox('Penalties', r.penalties ?? 0)}${statBox('Sand saves', r.sandAtt ? `${r.sandMade}/${r.sandAtt}` : '—')}</div>
+      ${r.holes.some(h => h.shots && h.shots.length) ? '<p class="tiny muted">Fairways, greens, putts and penalties on holes where you tracked shots were filled in from them.</p>' : ''}
       ${scorecardTable(r.holes, r.pars, r.si, r.firstHole)}
       ${sgRoundHtml(r)}${PlanReview.html(r)}${Group.resultsHtml(r)}
       ${aiBox(r)}
@@ -419,7 +439,7 @@ Object.assign(Actions, {
       if (lr && y >= 1) {
         const course = App.state.courses.find(c => c.id === lr.courseId), holeNo = (lr.first || 0) + lr.cur + 1;
         const flag = (lr.pins && lr.pins[holeNo]) || (course ? CourseMap.holeInfo(course, holeNo).green : null);
-        const s = SG.record(lr, course, holeNo, g.club, g.start, pos, flag); if (s) { g.lastShot = s.id; g.lastLie = s.toLie; }
+        const s = SG.record(lr, course, holeNo, g.club, g.start, pos, flag); if (s) { g.lastShot = s.id; g.lastLie = s.toLie; SG.autoFill(lr, lr.cur); }
       }
       Store.save();
       g.start = g.once ? null : pos; g.once = false;   // the hole view picks a club before each shot

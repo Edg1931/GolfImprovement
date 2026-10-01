@@ -93,6 +93,9 @@ const AutoCaddie = {
     try {
       const center = course.geo || (course.map && course.map.center);
       const need = this.mapped(course) < course.pars.length;
+      // start the satellite scan straight away, alongside OpenStreetMap, rather than one after the other
+      const wantScan = need && center && navigator.onLine && !(course.prep && course.prep.scan && !opts.force);
+      const scanP = wantScan ? this.scanFetch(course, center).catch(() => null) : null;
       if (need && center && navigator.onLine && !(course.prep && course.prep.osm && !opts.force)) {
         say('Mapping the course…');
         try {
@@ -104,12 +107,15 @@ const AutoCaddie = {
           course.prep = Object.assign({}, course.prep, { osm: todayISO() });
         } catch (e) { out.error = navigator.onLine ? 'The map service is busy right now.' : 'You are offline.'; }
       }
-      // holes still missing: scan the satellite photo for them
-      if (center && navigator.onLine && this.mapped(course) < course.pars.length && !(course.prep && course.prep.scan && !opts.force)) {
-        say('Scanning the satellite photo…');
-        try { out.scanned = await this.scan(course, center); } catch (e) { /* the map service is busy: the player can still map it by hand */ }
+      // holes still missing: fill them from the satellite scan
+      if (scanP && this.mapped(course) < course.pars.length) {
+        say('Reading the satellite photo…');
+        const s = await scanP;
+        if (s) out.scanned = this.applyScan(course, center, s);
       }
       out.mapped = this.mapped(course);
+      // say the course is mapped now; the plan for each hole follows
+      if (opts.onMapped) opts.onMapped(out);
       if (out.mapped) { say('Planning every hole…'); out.planned = await GamePlan.course(course, n => say(`Planning hole ${n}…`)); }
       course.prep = Object.assign({}, course.prep, { at: todayISO(), mapped: out.mapped, inferred: (course.prep && course.prep.inferred || 0) + out.inferred });
       Store.save();
@@ -119,15 +125,21 @@ const AutoCaddie = {
 
   /* Ask the server to find the greens, tees, bunkers and water on the satellite photo and match them to
      the scorecard. Holes from OpenStreetMap or set by hand are passed along and kept as they are. */
-  async scan(course, center) {
-    const holesOf = () => (course.map && course.map.holes) || {}, known = {};
-    course.pars.forEach((_, i) => { const h = holesOf()[i + 1]; if (h && h.tee && h.green && !h.scanned) known[i + 1] = { tee: h.tee, green: h.green }; });
-    const r = await fetch('/api/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ lat: center.lat, lon: center.lon, pars: course.pars, yards: course.yards || null, known }) });
-    if (!r.ok) return 0;
-    const s = await r.json(), holes = {};
+  /* The scan for a course is the same for everyone, so it's a plain GET the server can cache. */
+  async scanFetch(course, center) {
+    const q = new URLSearchParams({ lat: center.lat.toFixed(5), lon: center.lon.toFixed(5), pars: course.pars.join(',') });
+    if (course.yards && course.yards.some(Boolean)) q.set('yards', course.yards.map(y => y || '').join(','));
+    const r = await fetch('/api/scan?' + q, { signal: AbortSignal.timeout ? AbortSignal.timeout(40000) : undefined });
+    return r.ok ? r.json() : null;
+  },
+  /* Fill holes the map doesn't have yet from a scan; holes from OpenStreetMap or set by hand win, and a
+     scanned hole that uses one of their greens or tees is left out. */
+  applyScan(course, center, s) {
+    const holesOf = () => (course.map && course.map.holes) || {}, holes = {};
+    const fixed = Object.values(holesOf()).filter(h => h && h.tee && h.green && !h.scanned);
     Object.entries(s.holes || {}).forEach(([k, h]) => {
       const mh = holesOf()[k]; if (mh && (mh.manual || (mh.tee && mh.green && !mh.scanned))) return;
+      if (fixed.some(f => yardsBetween(f.green, h.green) < 30 || yardsBetween(f.tee, h.tee) < 25)) return;
       holes[k] = { par: course.pars[k - 1], line: [h.tee, h.green], tee: h.tee, green: h.green, scanned: true };
     });
     // skip anything the map already has
@@ -141,10 +153,13 @@ const AutoCaddie = {
 
   /* After a course is added from search: prepare it in the background and say what happened. */
   async afterAdd(course) {
-    const res = await this.prepare(course);
-    if (!res) return;
     const n = course.pars.length;
-    if (res.mapped) App.toast(`${course.name}: ${res.mapped === n ? 'all ' + n : res.mapped + ' of ' + n} holes mapped${res.scanned ? ` (${res.scanned} from the satellite photo)` : ''}, game plan ready`);
+    const res = await this.prepare(course, { onMapped: r => {
+      if (r.mapped) App.toast(`${course.name}: ${r.mapped === n ? 'all ' + n : r.mapped + ' of ' + n} holes mapped${r.scanned ? ` (${r.scanned} from the satellite photo)` : ''}. Planning each hole…`);
+      if (App.route() === 'play' || App.route() === 'gameplan') App.render();
+    } });
+    if (!res) return;
+    if (res.mapped) App.toast(`${course.name}: game plan ready`);
     else if (!res.error) App.toast(`Couldn’t find ${course.name}’s holes on the map. Open a hole to set its tee and green: about 10 seconds a hole.`);
     if (App.route() === 'play' || App.route() === 'gameplan') App.render();
   },

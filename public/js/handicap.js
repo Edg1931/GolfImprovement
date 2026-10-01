@@ -182,19 +182,19 @@ function adjustedGross(holes, pars, si, ch) {
 function statsFromHoles(holes, pars) {
   const played = holes.map((h, i) => ({ ...h, par: pars[i] })).filter(h => h.strokes != null);
   const s = { gross: 0, putts: 0, firHit: 0, firPossible: 0, gir: 0, penalties: 0, udAtt: 0, udMade: 0, sandAtt: 0, sandMade: 0, threePutts: 0, doubles: 0 };
-  let puttsKnown = false;
+  let puttsKnown = false, girKnown = false;
   played.forEach(h => {
     s.gross += h.strokes; s.penalties += h.pen || 0;
     if (h.strokes >= h.par + 2) s.doubles++;
     if (h.par >= 4 && h.fir) { s.firPossible++; if (h.fir === 'hit') s.firHit++; }
-    if (h.putts != null) {
-      puttsKnown = true; s.putts += h.putts; if (h.putts >= 3) s.threePutts++;
-      const gir = h.strokes - h.putts <= h.par - 2;
-      if (gir) s.gir++; else { s.udAtt++; if (h.strokes <= h.par) s.udMade++; }
-    }
+    if (h.putts != null) { puttsKnown = true; s.putts += h.putts; if (h.putts >= 3) s.threePutts++; }
+    // green in regulation: from putts, or from tracked shots (which shot reached the green)
+    const gir = h.putts != null ? h.strokes - h.putts <= h.par - 2 : h.girShots != null ? h.girShots : null;
+    if (gir != null) { girKnown = true; if (gir) s.gir++; else { s.udAtt++; if (h.strokes <= h.par) s.udMade++; } }
     if (h.sand) { s.sandAtt++; if (h.strokes <= h.par) s.sandMade++; }
   });
-  if (!puttsKnown) ['putts', 'gir', 'udAtt', 'udMade', 'threePutts'].forEach(k => { s[k] = null; });
+  if (!puttsKnown) ['putts', 'threePutts'].forEach(k => { s[k] = null; });
+  if (!girKnown) ['gir', 'udAtt', 'udMade'].forEach(k => { s[k] = null; });
   if (!s.firPossible) { s.firHit = null; s.firPossible = null; }
   return s;
 }

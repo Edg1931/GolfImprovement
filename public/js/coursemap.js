@@ -44,7 +44,7 @@ const CourseMap = {
     let lastErr;
     for (const url of OVERPASS) {
       try {
-        const r = await fetch(url, { method: 'POST', body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+        const r = await fetch(url, { method: 'POST', body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: AbortSignal.timeout ? AbortSignal.timeout(12000) : undefined });   // a busy server: try the next one
         if (r.ok) return await r.json();
         lastErr = new Error('Map service returned ' + r.status);
       } catch (e) { lastErr = e; }

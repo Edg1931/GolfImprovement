@@ -699,14 +699,14 @@ function hvSheetHtml(sheet, h) {
   if (sheet === 'score' && lr) {
     const hh = lr.holes[lr.cur], par = h.par, quick = [-1, 0, 1, 2, 3].map(d => par + d).filter(v => v > 0);
     const last = lr.cur >= lr.holes.length - 1;
-    return `${close}<h3>Hole ${h.n} · Par ${par}</h3>
+    return `${close}<h3>Hole ${h.n} · Par ${par}</h3>${shotSummary(hh, par)}
       <div class="entry"><div class="entry-label">Score</div>
         <div class="stepper"><button class="step" data-action="holeStep" data-k="strokes" data-d="-1" aria-label="One fewer stroke">−</button><output class="step-val ${scoreClass(hh.strokes, par)}">${hh.strokes != null ? hh.strokes : '–'}</output><button class="step" data-action="holeStep" data-k="strokes" data-d="1" aria-label="One more stroke">+</button></div>
         <div class="chip-row">${quick.map(v => `<button class="chip ${hh.strokes === v ? 'active' : ''}" data-action="holeSet" data-k="strokes" data-v="${v}">${scoreName(v, par)}</button>`).join('')}</div></div>
-      <div class="entry"><div class="entry-label">Putts</div><div class="seg">${[0, 1, 2, 3, 4].map(v => `<button class="${hh.putts === v ? 'active' : ''}" data-action="holeSet" data-k="putts" data-v="${v}">${v}${v === 4 ? '+' : ''}</button>`).join('')}</div></div>
+      <div class="entry"><div class="entry-label">Putts${autoTag(hh, 'putts')}</div><div class="seg">${[0, 1, 2, 3, 4].map(v => `<button class="${hh.putts === v ? 'active' : ''}" data-action="holeSet" data-k="putts" data-v="${v}">${v}${v === 4 ? '+' : ''}</button>`).join('')}</div></div>
       ${firstPuttEntry(hh)}
-      ${par >= 4 ? `<div class="entry"><div class="entry-label">Tee shot</div><div class="seg">${FAIRWAY_OPTS.map(([v, l]) => `<button class="${hh.fir === v ? 'active' : ''}" data-action="holeSet" data-k="fir" data-v="${v}">${l}</button>`).join('')}</div></div>` : ''}
-      <div class="entry"><div class="entry-label">Penalties</div><div class="stepper sm"><button class="step" data-action="holeStep" data-k="pen" data-d="-1" aria-label="Remove penalty">−</button><output class="step-val">${hh.pen || 0}</output><button class="step" data-action="holeStep" data-k="pen" data-d="1" aria-label="Add penalty">+</button></div></div>
+      ${par >= 4 ? `<div class="entry"><div class="entry-label">Tee shot${autoTag(hh, 'fir')}</div><div class="seg">${FAIRWAY_OPTS.map(([v, l]) => `<button class="${hh.fir === v ? 'active' : ''}" data-action="holeSet" data-k="fir" data-v="${v}">${l}</button>`).join('')}</div></div>` : ''}
+      <div class="entry"><div class="entry-label">Penalties${autoTag(hh, 'pen')}</div><div class="stepper sm"><button class="step" data-action="holeStep" data-k="pen" data-d="-1" aria-label="Remove penalty">−</button><output class="step-val">${hh.pen || 0}</output><button class="step" data-action="holeStep" data-k="pen" data-d="1" aria-label="Add penalty">+</button></div></div>
       ${lr.players && lr.players.length ? `<div class="entry"><div class="entry-label">Group</div>${Group.inputs(lr)}</div>` : ''}
       <div class="btn-row mt">${last ? `<button class="btn primary lg grow" data-action="hvFinish">Review &amp; finish ›</button>` : `<button class="btn primary lg grow" data-action="hvHole" data-d="1" ${hh.strokes == null ? 'disabled' : ''}>Save · next hole ›</button>`}</div>
       <p class="tiny muted mb0">Greenside bunkers and notes are on the full <a href="#/play">scorecard</a>.</p>`;
@@ -844,7 +844,7 @@ Object.assign(Actions, {
   hvTipHide() { const h = HoleView.info(); if (h) HoleView.s.tipHidden[h.c.id + ':' + h.n] = true; App.render(); },
   hvLie(el) {
     const lr = App.state.liveRound, gps = App.ui.gps || {}; if (!lr) return;
-    lr.holes.forEach(h => (h.shots || []).forEach(s => { if (s.id === gps.lastShot) s.toLie = el.dataset.v; }));
+    lr.holes.forEach((h, i) => (h.shots || []).forEach(s => { if (s.id === gps.lastShot) { s.toLie = el.dataset.v; SG.autoFill(lr, i); } }));
     gps.lastLie = el.dataset.v; Store.save(); App.ui.hvSheet = null; App.render();
   },
   async hvDownload() {

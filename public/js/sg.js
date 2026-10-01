@@ -64,6 +64,45 @@ const SG = {
     return s;
   },
 
+  /* Fill in the hole's stats from its tracked shots, so they needn't be entered: the tee shot (fairway
+     hit, or missed left or right), green in regulation (which shot reached the green), putts (score
+     minus the shots to reach the green), penalties (shots into water or out of bounds) and a
+     greenside bunker. Anything the player set by hand (h.set) is left alone; h.auto marks what was
+     filled in. Returns the hole. */
+  autoFill(lr, i) {
+    const h = lr && lr.holes[i]; if (!h) return h;
+    const shots = h.shots || [];
+    const set = h.set || {}, auto = h.auto = {}, par = lr.pars[i];
+    if (!shots.length) { h.girShots = null; return h; }
+    const holeNo = (lr.first || 0) + i + 1, course = lr.courseId && App.state.courses.find(c => c.id === lr.courseId);
+    const info = course ? CourseMap.holeInfo(course, holeNo) : {}, flag = (lr.pins && lr.pins[holeNo]) || info.green;
+    const pen = s => (s.toLie === 'water' || s.toLie === 'ob' ? 1 : 0);
+    if (!set.pen) { const p = shots.reduce((a, s) => a + pen(s), 0); if (p || h.pen) { h.pen = p; auto.pen = true; } }
+    // the shot that reached the green (shots from the green are putts)
+    const k = shots.findIndex(s => s.toLie === 'green' && s.fromLie !== 'green');
+    if (k >= 0) {
+      const toGreen = k + 1 + shots.slice(0, k + 1).reduce((a, s) => a + pen(s), 0);
+      h.toGreen = toGreen; h.girShots = toGreen <= par - 2;
+      if (!set.putts && h.strokes != null) { h.putts = Math.max(0, Math.min(6, h.strokes - toGreen)); auto.putts = true; }
+    } else { h.toGreen = null; h.girShots = null; }
+    // the tee shot
+    const t = shots[0];
+    if (par >= 4 && !set.fir && t && t.fromLie === 'tee' && t.toLie && t.toLie !== 'tee') {
+      if (t.toLie === 'fairway' || t.toLie === 'green') h.fir = 'hit';
+      else {
+        const end = flag || info.green, side = end ? Caddie.offsets({ x: 0, y: 0 }, Caddie.projector(t.from).toXY(end), Caddie.projector(t.from).toXY(t.to)).lat : 0;
+        h.fir = side < 0 ? 'left' : 'right';
+      }
+      auto.fir = true;
+    }
+    // a bunker shot near the green
+    if (!set.sand && flag) {
+      const gs = shots.some(s => s.fromLie === 'sand' && yardsBetween(s.from, flag) < 50);
+      if (gs || h.sand) { h.sand = gs; auto.sand = true; }
+    }
+    return h;
+  },
+
   /* Fill in the numbers strokes gained needs when a round is saved: hole length and each shot's distances. */
   prepare(r, course) {
     if (!r.holes) return;

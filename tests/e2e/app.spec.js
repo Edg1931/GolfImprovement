@@ -529,6 +529,7 @@ test('map an unmapped course from home: find it, tap tee and green, add a dogleg
 test('range mode: tap the pad or type shots, and the session lands in the practice log', async ({ page }) => {
   const errs = trackErrors(page); await withDemo(page);
   await page.goto('/#/range');
+  await page.click('[data-action=rangeSet][data-k=view][data-v=pad]');
   await page.click('[data-action=rangeClub][data-club="7i"]');
   const box = await page.locator('#rangePad').boundingBox();
   await page.mouse.click(box.x + box.width * 0.75, box.y + box.height * 0.5);   // right of the target, about the usual distance
@@ -652,7 +653,8 @@ test('adding a course maps it and writes a game plan for every hole, before you 
   await page.goto('/#/play');
   await page.fill('input[name=q]', 'seaside'); await page.click('.search-row button');
   await page.click('.tee-opt');
-  await expect(page.locator('.toast').last()).toContainText('2 of 18 holes mapped, game plan ready', { timeout: 15000 });
+  await expect(page.locator('.toast', { hasText: '2 of 18 holes mapped' }).first()).toBeAttached({ timeout: 15000 });
+  await expect(page.locator('.toast', { hasText: 'game plan ready' }).first()).toBeAttached({ timeout: 15000 });
   const c = await page.evaluate(() => { const c = App.state.courses.find(x => x.name === 'Seaside Links'); return { plans: c.plans, holes: Object.keys(c.map.holes), inferred: c.prep.inferred }; });
   expect(c.holes.sort()).toEqual(['1', '2']); expect(c.inferred).toBe(2);
   expect(c.plans[1].length).toBeGreaterThanOrEqual(2); expect(c.plans[1].every(s => s.auto)).toBe(true);
@@ -699,5 +701,67 @@ test('phone: bottom tabs, the More sheet, and Play going straight to the hole vi
   await expect(page.locator('#tabPlay')).toHaveAttribute('href', '#/gps');
   await page.goto('/#/dashboard'); await page.click('#tabPlay');
   await expect(page.locator('.hv-card')).toBeVisible();
+  expect(errs).toEqual([]);
+});
+
+test('tracked shots fill in the fairway, green in regulation, putts and penalties @phone', async ({ page, context }) => {
+  const errs = trackErrors(page); await mapFixtures(context); await withDemo(page);
+  await startMappedRound(page);
+  await page.click('[data-action=openHoleView]');
+  const track = async (club, x, y) => {
+    await page.click('#hvTrack'); await page.click(`.hv-sheet [data-action=hvMark][data-club="${club}"]`);
+    await at(context, x, y); await expect(page.locator('#hvTrack small')).toContainText('yds so far');
+    await page.click('#hvTrack'); await expect(page.locator('#hvTrack')).toContainText('last:');
+  };
+  await track('Driver', 15, 240);          // fairway, a little right of centre
+  await track('9i', 2, 378);               // onto the green: two shots, a green in regulation
+  await page.click('.hv-score');
+  await expect(page.locator('.hv-sheet .shot-sum')).toContainText('on the green in 2');
+  await expect(page.locator('.hv-sheet .shot-sum')).toContainText('green in regulation');
+  await expect(page.locator('.hv-sheet .shot-sum')).toContainText('fairway hit');
+  // the score first: + starts at two putts from the green (4), and the putts follow it
+  await page.click('.hv-sheet [data-action=holeStep][data-k=strokes][data-d="1"]');
+  await expect(page.locator('.hv-sheet .step-val').first()).toHaveText('4');
+  let h = await page.evaluate(() => App.state.liveRound.holes[0]);
+  expect(h.putts).toBe(2); expect(h.fir).toBe('hit'); expect(h.girShots).toBe(true);
+  await expect(page.locator('.hv-sheet .auto-tag').first()).toBeVisible();
+  await page.click('.hv-sheet [data-action=holeStep][data-k=strokes][data-d="1"]');
+  expect(await page.evaluate(() => App.state.liveRound.holes[0].putts)).toBe(3);
+  // or the putts first: tapping 3 putts sets the score from the shots that reached the green
+  await page.evaluate(() => { const x = App.state.liveRound.holes[0]; x.strokes = null; x.putts = null; x.set = {}; Store.save(); App.render(); });
+  await page.click('.hv-sheet .seg button:has-text("3")');
+  h = await page.evaluate(() => App.state.liveRound.holes[0]);
+  expect(h.strokes).toBe(5); expect(h.putts).toBe(3);
+  // the round's stats use them
+  const st = await page.evaluate(() => statsFromHoles(App.state.liveRound.holes, App.state.liveRound.pars));
+  expect(st.gir).toBe(1); expect(st.firHit).toBe(1); expect(st.putts).toBe(3); expect(st.udAtt).toBe(0);
+  // into the water off the tee on the next hole: a penalty and no fairway (par 3, so no fairway stat)
+  await page.click('.hv-sheet [data-action=hvHole]');
+  await at(context, 60, 400);
+  await track('7i', 175, 400);
+  expect(await page.evaluate(() => App.state.liveRound.holes[1].pen)).toBe(1);
+  expect(errs).toEqual([]);
+});
+
+test('range mode on the satellite map: no yardage signs, tap where the ball landed @phone', async ({ page, context }) => {
+  const errs = trackErrors(page); await mapFixtures(context); await withDemo(page);
+  await page.goto('/#/range');
+  await page.click('[data-action=rangeClub][data-club="7i"]');
+  // your spot comes from GPS
+  await page.waitForFunction(() => !!(App.ui.rng && App.ui.rng.bay));
+  await expect(page.locator('.rng-step')).toContainText('Tap the flag');
+  const tapAt = async (x, y) => {
+    const p = await page.evaluate(([x, y]) => { const b = App.ui.rng.bay, q = Caddie.projector(b).toLL({ x, y }), pt = Range.lmap.latLngToContainerPoint([q.lat, q.lon]), r = document.getElementById('rangeMapSlot').getBoundingClientRect(); return { x: r.left + pt.x, y: r.top + pt.y }; }, [x, y]);
+    await page.mouse.click(p.x, p.y);
+  };
+  await tapAt(0, 160);                                   // the target flag, 160 yds straight out
+  await expect(page.locator('.rng-step')).toContainText('Target 16');
+  await tapAt(8, 150);                                   // a ball that landed 150 out, 8 yds right
+  await expect.poll(() => page.evaluate(() => App.state.shotLog.filter(s => s.source === 'range').length)).toBe(1);
+  const s = await page.evaluate(() => App.state.shotLog.filter(s => s.source === 'range').pop());
+  expect(s.club).toBe('7i'); expect(Math.abs(s.read - 150)).toBeLessThanOrEqual(3); expect(s.lat).toBeGreaterThan(5); expect(s.lat).toBeLessThan(11);
+  await expect(page.locator('.card', { hasText: 'This session' })).toContainText('1 ball');
+  await page.click('[data-action=rangeFinish]');
+  await expect(page.locator('.toast').last()).toContainText('Range session saved');
   expect(errs).toEqual([]);
 });
