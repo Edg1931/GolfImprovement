@@ -272,7 +272,7 @@ const HoleView = {
       const mx = (a.x + z.x) / 2, my = (a.y + z.y) / 2;
       if (my < 150 || my > this.g.H - 240) return '';   // off the visible part of the map (e.g. zoomed to the green)
       // keep bubbles clear of the line and of the buttons down the right-hand side
-      const bw = cls === 'main' ? 222 : 120, room = this.g.W - 70;
+      const bw = cls === 'main' ? 200 : 104, room = this.g.W - 66;
       const fitsR = mx + 18 + bw <= room, fitsL = mx - 18 - bw >= 4;
       const left = fitsR && fitsL ? mx > this.g.W * 0.55 : fitsL || (!fitsR && mx - 18 > room - mx - 18);   // neither fits: the roomier side
       const x = Math.max(4, Math.min(room - bw, left ? mx - 18 - bw : mx + 18));
@@ -285,11 +285,11 @@ const HoleView = {
       const plays = bits.length ? `<small class="hv-plays">${bits.join(' · ')}</small>` : '';
       const adv = this.s.advice;
       const risk = adv && this.s.adviceKey === this.adviceKey() ? (adv.green != null && !this.s.target ? `${Math.round(adv.green * 100)}% green` : adv.trouble >= 0.05 ? `${Math.round(adv.trouble * 100)}% trouble` : adv.fairway != null ? `${Math.round(adv.fairway * 100)}% fairway` : '') : '';
-      html += bubble(bs, ts, 'main', `<span class="hv-yds">${Math.round(d1)}<small>y</small></span><button class="hv-club" data-action="hvSheet" data-v="caddie"><strong>${club ? escapeHtml(club.club) : 'Caddie'}</strong><small>${risk || (club && club.learned ? 'your pattern' : 'tap for advice')}</small>${plays}<span class="hv-chev">›</span></button>`);
+      html += bubble(bs, ts, 'main', `<button class="hv-club" data-action="hvSheet" data-v="caddie"><span class="hv-yds">${Math.round(d1)}<small>yds</small></span><span class="hv-club-txt"><strong>${club ? escapeHtml(club.club) : 'Caddie'}</strong><small>${risk || (club && club.learned ? 'your pattern' : 'tap for advice')}</small>${plays}</span></button>`);
     }
     if (d2 != null && ts && gs) {
       const c2 = models.length ? this.clubFor(d2, models, playsLikeYards(d2, cd.head, 0)) : null;
-      html += bubble(ts, gs, 'second', `<span class="hv-yds">${Math.round(d2)}<small>y</small></span>${c2 ? `<span class="hv-club2">${escapeHtml(c2.club)}</span>` : ''}`);
+      html += bubble(ts, gs, 'second', `<span class="hv-yds">${Math.round(d2)}</span>${c2 ? `<span class="hv-club2">${escapeHtml(c2.club)}</span>` : ''}`);
     }
     box.innerHTML = `<svg class="hv-svg" width="${this.g.W}" height="${this.g.H}">${svg}</svg>${html}`;
     this.header(h, start);
@@ -367,7 +367,7 @@ const HoleView = {
     labels.sort((a, b) => a.reach - b.reach).slice(0, 6).forEach(l => {
       const p = S(l.cen); if (!p) return;
       const x = Math.max(4, Math.min(W - 58, p.x + (l.lat < 0 ? -62 : 14))), y = p.y - 22;
-      html += `<div class="hv-haz ${l.f.type}" style="left:${x}px;top:${y}px" title="${l.f.type === 'water' ? 'Water' : 'Bunker'}: reach ${l.reach}, carry ${l.carry}"><b>${l.carry}</b><span>${l.reach}</span></div>`;
+      html += `<div class="hv-haz ${l.f.type}" style="left:${x}px;top:${y}px" title="${l.f.type === 'water' ? 'Water' : 'Bunker'}: reach ${l.reach}, carry ${l.carry}"><span>${l.reach}</span><b>${l.carry}</b></div>`;
     });
     if (this.s.zoom === 'green') {
       [['front', 'F'], ['back', 'B']].forEach(([k, t]) => { const q = h[k] && S(h[k]); if (q) html += `<div class="hv-fbl" style="left:${q.x}px;top:${q.y}px">${t} ${Math.round(yardsBetween(start, h[k]))}</div>`; });
@@ -380,7 +380,7 @@ const HoleView = {
       if (d > total - 25) return;
       const q = S(proj.toLL(Caddie.alongPolyline(line, d))); if (!q) return;
       const t = this.s.target && S(this.s.target); if (t && Math.hypot(q.x - t.x, q.y - t.y) < 44) return;   // don't sit under the target
-      html += `<div class="hv-mark" style="left:${q.x}px;top:${q.y}px"><span>${d}</span></div>`;
+      html += `<div class="hv-mark" style="left:${q.x}px;top:${q.y}px"><i></i><span>${d}</span></div>`;
     });
     return html;
   },
@@ -390,7 +390,8 @@ const HoleView = {
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
     const y = p => (start && p ? Math.round(yardsBetween(start, p)) : '—');
     set('hvMid', y(h.flag));
-    set('hvFB', h.front || h.back ? `F ${y(h.front)} · B ${y(h.back)}` : '');
+    set('hvFront', h.front ? 'F ' + y(h.front) : '');
+    set('hvBack', h.back ? 'B ' + y(h.back) : '');
   },
   /* The flag for this hole: kept with the live round, or for this session when just looking. */
   setPin(p) {
@@ -597,6 +598,19 @@ const Offline = {
 };
 
 /* ---------- page ---------- */
+/* Line icons for the hole view (24-unit grid, drawn in the current text colour). */
+const hvSvg = d => `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const HV_ICON = {
+  flag: hvSvg('<path d="M6 21V4"/><path d="M6 4h11l-3 4 3 4H6"/>'),
+  big: hvSvg('<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M8 10v5M11.5 10h2.5v2h-2.5v3H14"/><path d="M17 10v5"/>'),
+  green: hvSvg('<ellipse cx="12" cy="12" rx="8" ry="6"/><circle cx="12" cy="12" r="1.5"/>'),
+  hole: hvSvg('<path d="M12 21c-2-3-3-6-2-9s3-6 2-9"/><circle cx="12" cy="3.5" r="1.5"/>'),
+  locate: hvSvg('<circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>'),
+  card: hvSvg('<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>'),
+  plan: hvSvg('<circle cx="6" cy="18" r="2"/><path d="M8 16l4-5 3 2 3-6"/><path d="M18 3v4h-4"/>'),
+  tools: hvSvg('<circle cx="12" cy="12" r="3"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/>'),
+};
+
 Views.gps = function () {
   const s = HoleView.s, lr = App.state.liveRound;
   if (App.ui.hv) { Object.assign(s, App.ui.hv); App.ui.hv = null; s.key = null; }
@@ -615,41 +629,41 @@ Views.gps = function () {
   const tipKey = h.c.id + ':' + h.n, tip = onTee && s.zoom !== 'green' && !s.tipHidden[tipKey] && s.mode !== 'pin' ? smartTip(h.c, h.n, h.pin, HoleView.cond(h.tee, h.flag)) : null;
   const lastShot = gps.lastShot && hlr ? hlr.holes.flatMap(x => x.shots || []).find(x => x.id === gps.lastShot) : null;
   const mapped = h.green && h.tee, setup = !mapped;
+  const mh = h.c.map && h.c.map.holes && h.c.map.holes[h.n], scanned = mapped && mh && mh.scanned && !mh.manual && !mh.checked;
   const back = hlr ? '#/play' : '#/map';
   let html = `<div class="hv ${setup ? 'setup' : ''}" id="hvSlot"><div class="hv-over" id="hvOver"></div>
     <div class="hv-top">
       <a class="hv-back" href="${back}" aria-label="Back">‹</a>
       <div class="hv-card">
-        <button class="hv-hole" data-action="hvSheet" data-v="holes" aria-label="Choose hole"><span>${h.n}</span><small>▾</small></button>
-        <div class="hv-cell hv-main"><small>${h.pin ? 'To the pin' : 'Mid green'}</small><strong><span id="hvMid">—</span><em>yds</em></strong><span class="hv-fb" id="hvFB"></span></div>
-        <div class="hv-cell"><small>Par</small><strong>${h.par || '—'}</strong></div>
-        <div class="hv-cell"><small>${escapeHtml((h.tees || 'Tee').split(/[ ·(]/)[0])}</small><strong>${h.yards || (h.tee && h.green ? Math.round(yardsBetween(h.tee, h.green)) : '—')}</strong></div>
-        <div class="hv-cell"><small>Hcp</small><strong>${h.si || '—'}</strong></div>
+        <button class="hv-hole" data-action="hvSheet" data-v="holes" aria-label="Choose hole"><small>Hole ▾</small><span>${h.n}</span></button>
+        <div class="hv-info"><b>Par ${h.par || '—'}</b><span>${h.yards || (h.tee && h.green ? Math.round(yardsBetween(h.tee, h.green)) : '—')} yds${h.tees ? ' · ' + escapeHtml(h.tees.split(/[ ·(]/)[0]) : ''}</span>${h.si ? `<span>Index ${h.si}</span>` : ''}</div>
+        <div class="hv-ladder" aria-label="Yards to the green"><span id="hvBack"></span><strong><span id="hvMid">—</span></strong><small>${h.pin ? 'to the flag' : 'to the middle'}</small><span id="hvFront"></span></div>
       </div>
     </div>
-    ${setup ? '' : s.mode === 'bend' ? '<div class="hv-hint">Tap the corner of the dogleg, where the hole bends <button class="btn sm ghost" data-action="hvBendMode">Cancel</button></div>' : s.mode === 'pin' ? '<div class="hv-hint">Tap where the flag is on the green <button class="btn sm ghost" data-action="hvPinMode">Cancel</button></div>' : tip ? `<button class="hv-tip" data-action="hvTipHide" aria-label="Caddie tip, tap to hide">${escapeHtml(tip)}</button>` : ''}
+    ${setup ? '' : s.mode === 'bend' ? '<div class="hv-hint">Tap the corner of the dogleg, where the hole bends <button class="btn sm ghost" data-action="hvBendMode">Cancel</button></div>' : s.mode === 'pin' ? '<div class="hv-hint">Tap where the flag is on the green <button class="btn sm ghost" data-action="hvPinMode">Cancel</button></div>' : tip ? `<button class="hv-tip" data-action="hvTipHide" aria-label="Caddie tip, tap to hide">${escapeHtml(tip)}</button>` : scanned ? '<div class="hv-hint hv-scan"><span>Found on the satellite photo. Is the tee and green right?</span><button class="btn sm ghost" data-action="hvRemap">Fix</button><button class="btn sm ghost" data-action="hvScanOk">Yes</button></div>' : ''}
     ${setup ? setupHtml(h) : ''}
     <div class="hv-side">
       <button class="hv-round hv-wind" id="hvWind" data-action="hvSheet" data-v="tools" aria-label="Wind" hidden></button>
-      <button class="hv-round ${h.pin ? 'on' : ''} ${s.mode === 'pin' ? 'active' : ''}" data-action="hvPinMode" aria-label="${h.pin ? 'Move the flag' : 'Set today’s flag position'}">⚑</button>
-      <button class="hv-round" data-action="hvGlance" aria-label="Big numbers">123</button>
-      <button class="hv-round" data-action="hvZoom" aria-label="${HoleView.s.zoom === 'green' ? 'Show the whole hole' : 'Zoom to the green'}">${HoleView.s.zoom === 'green' ? '⤢' : '⚲'}</button>
-      <button class="hv-round" data-action="hvLocate" aria-label="Use my position">◎</button>
+      <button class="hv-round ${h.pin ? 'on' : ''} ${s.mode === 'pin' ? 'active' : ''}" data-action="hvPinMode" aria-label="${h.pin ? 'Move the flag' : 'Set today’s flag position'}">${HV_ICON.flag}</button>
+      <button class="hv-round" data-action="hvGlance" aria-label="Big numbers">${HV_ICON.big}</button>
+      <button class="hv-round" data-action="hvZoom" aria-label="${HoleView.s.zoom === 'green' ? 'Show the whole hole' : 'Zoom to the green'}">${HoleView.s.zoom === 'green' ? HV_ICON.hole : HV_ICON.green}</button>
+      <button class="hv-round" data-action="hvLocate" aria-label="Use my position">${HV_ICON.locate}</button>
     </div>
     <div class="hv-bottom">
       ${lastShot && !gps.start ? `<button class="hv-lie" data-action="hvSheet" data-v="lie">Last shot: ${escapeHtml(lastShot.club || 'shot')} · ${Math.round(yardsBetween(lastShot.from, lastShot.to))} yds · <b>${SG.LIES.find(l => l[0] === lastShot.toLie)?.[1] || lastShot.toLie}</b> ✎</button>` : ''}
       ${hlr || setup ? '' : planStripHtml(h)}
       ${hlr ? `<button class="hv-track ${gps.start ? 'on' : ''}" id="hvTrack" data-action="${gps.start ? 'hvMeasure' : 'hvSheet'}" data-v="club">${gps.start ? `Measure ${gps.club ? escapeHtml(gps.club) : 'shot'} <small>${App._lastPos ? Math.round(yardsBetween(gps.start, App._lastPos)) + ' yds so far' : 'walk to your ball'}</small>` : `Track shot${gps.last != null ? ` <small>last: ${gps.last} yds${gps.lastClub ? ' ' + escapeHtml(gps.lastClub) : ''}${gps.lastLat != null && Math.abs(gps.lastLat) >= 2 ? ', ' + Math.abs(Math.round(gps.lastLat)) + (gps.lastLat > 0 ? ' R' : ' L') : ''}</small>` : ''}`}</button>` : ''}
       <div class="hv-row">
-        ${hlr ? '<a class="hv-btn" href="#/play"><span>Scorecard</span><small>›</small></a>' : '<button class="hv-btn" data-action="hvPlan"><span>Planner</span><small>›</small></button>'}
+        ${hlr ? `<a class="hv-btn" href="#/play">${HV_ICON.card}<span>Card</span></a>` : `<button class="hv-btn" data-action="hvPlan">${HV_ICON.plan}<span>Planner</span></button>`}
+        <button class="hv-prev" data-action="hvHole" data-d="-1" aria-label="Previous hole" ${h.n <= (hlr ? (hlr.first || 0) + 1 : 1) ? 'disabled' : ''}>‹</button>
         ${hlr ? `<button class="hv-score ${cur.strokes != null ? 'done' : ''}" data-action="hvSheet" data-v="score"><strong>Hole ${h.n}</strong><small>${cur.strokes != null ? `${cur.strokes} · ${scoreName(cur.strokes, h.par)}` : 'Enter score'}</small></button>`
           : setup ? `<button class="hv-score" disabled><strong>Hole ${h.n}</strong><small>${h.tee ? 'tap the green' : 'tap the tee'}</small></button>`
           : (() => { const pc = mapped && HoleView.planClub(h); return `<button class="hv-score plan" data-action="hvAddShot" ${pc ? '' : 'disabled'}><strong>＋ ${pc ? escapeHtml(pc.club) : 'Add shot'}</strong><small>add to hole ${h.n} plan</small></button>`; })()}
         <button class="hv-next" data-action="hvHole" data-d="1" aria-label="Next hole" ${h.n >= (hlr ? (hlr.first || 0) + hlr.holes.length : h.holes) ? 'disabled' : ''}>›</button>
-        <button class="hv-btn" data-action="hvSheet" data-v="tools"><span>Tools</span><small>›</small></button>
+        <button class="hv-btn" data-action="hvSheet" data-v="tools">${HV_ICON.tools}<span>Tools</span></button>
       </div>
+      <div class="hv-attr">Imagery © Esri, Maxar, Earthstar Geographics</div>
     </div>
-    <div class="hv-attr">Imagery © Esri, Maxar, Earthstar Geographics</div>
   </div>`;
   return html + sheetHtml;
 };
@@ -777,6 +791,7 @@ Object.assign(Actions, {
     else { if (to < 1 || to > h.holes) return; HoleView.s.hole = to; }
     App.ui.hvSheet = null; HoleView._gpsFit = false; App.render();
   },
+  hvScanOk() { const h = HoleView.info(), mh = h && h.c.map && h.c.map.holes[h.n]; if (mh) { mh.checked = true; Store.save(); } App.render(); },
   hvFinish() { App.ui.hvSheet = null; App.ui.hvGlance = false; location.hash = '#/play'; },
   /* Add a shot to this hole's plan: from the ball to the target with the club shown; the next shot
      starts where this one finishes, until the plan reaches the green. */

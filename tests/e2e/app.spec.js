@@ -317,7 +317,11 @@ test('full-screen hole view: turned map, draggable target, score and shot tracki
   await page.click('.hv-sheet [data-action=hvHole]');
   await expect(page.locator('.hv-hole span')).toHaveText('2');
   // swipe right to go back a hole, and left again
-  const sw = async dx => { await page.mouse.move(200, 500); await page.mouse.down(); await page.mouse.move(200 + dx, 505, { steps: 5 }); await page.mouse.up(); };
+  // start on open map, clear of the labels and buttons
+  const sw = async dx => {
+    const p = await page.evaluate(() => { for (let y = 300; y < innerHeight - 250; y += 20) for (let x = 170; x < innerWidth - 170; x += 10) { const el = document.elementFromPoint(x, y); if (el && (el.id === 'hvOver' || el.tagName === 'svg' || el.closest('.hv-svg'))) return { x, y }; } return { x: 200, y: 500 }; });
+    await page.mouse.move(p.x, p.y); await page.mouse.down(); await page.mouse.move(p.x + dx, p.y + 5, { steps: 5 }); await page.mouse.up();
+  };
   await sw(150); await expect(page.locator('.hv-hole span')).toHaveText('1');
   await sw(-150); await expect(page.locator('.hv-hole span')).toHaveText('2');
   expect(await page.evaluate(() => App.state.liveRound.holes[0].strokes)).toBe(4);
@@ -365,7 +369,7 @@ test('hole view: live wind and slope, flag of the day, tee tip, auto-advance, gl
   await expect(page.locator('.hv-hint')).toBeVisible();
   const pinPt = await page.evaluate(q => HoleView.toScreen(q), fx.ll(8, 374));
   await page.mouse.click(pinPt.x, pinPt.y);
-  await expect(page.locator('.hv-main small')).toHaveText('To the pin');
+  await expect(page.locator('.hv-ladder small')).toHaveText('to the flag');
   const pin = await page.evaluate(() => App.state.liveRound.pins[1]);
   expect(Math.abs(pin.lat - fx.ll(8, 374).lat)).toBeLessThan(0.00003);
   await expect(page.locator('#hvMid')).toHaveText(/^37\d$/);
